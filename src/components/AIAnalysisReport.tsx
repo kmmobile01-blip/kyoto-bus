@@ -6,9 +6,10 @@ import Markdown from 'react-markdown';
 
 interface AIAnalysisReportProps {
     data: AggregatedYearlyData[];
+    customApiKey?: string;
 }
 
-export const AIAnalysisReport: React.FC<AIAnalysisReportProps> = ({ data }) => {
+export const AIAnalysisReport: React.FC<AIAnalysisReportProps> = ({ data, customApiKey }) => {
     const [report, setReport] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -20,7 +21,7 @@ export const AIAnalysisReport: React.FC<AIAnalysisReportProps> = ({ data }) => {
         setError(null);
         
         try {
-            const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
+            const apiKey = customApiKey || process.env.API_KEY || process.env.GEMINI_API_KEY;
             const ai = new GoogleGenAI({ apiKey: apiKey });
             
             const totalCostA = data.reduce((sum, d) => sum + d.A.total, 0);

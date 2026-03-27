@@ -6,7 +6,7 @@ import {
     FileSpreadsheet, Loader2, AlertCircle, CheckCircle2, Sliders,
     FileDown, Database, Trash2, ShieldCheck, RotateCcw, Copy, FileText,
     PieChart, Users, Medal, ChevronDown, ChevronUp, UserPlus, Calendar, ArrowRightCircle, HelpCircle,
-    Play, Lock, RefreshCw
+    Play, Lock, RefreshCw, Key
 } from 'lucide-react';
 import { 
     EmployeeInputRow, TableRowT1, TableRowT2, CoefSettings, 
@@ -23,6 +23,8 @@ import { ResultCard } from './components/ResultCard';
 import { AIAnalysisReport } from './components/AIAnalysisReport';
 import { MasterEditorModal } from './components/MasterEditorModal';
 import { HelpModal } from './components/HelpModal';
+import { AnnualCostChart } from './components/AnnualCostChart';
+import { ApiSettingsModal } from './components/ApiSettingsModal';
 
 // 旧制度マスタ(T1形式)を新制度マスタ(T2形式)の構造に変換するヘルパー
 const convertT1toT2 = (t1: TableRowT1[]): TableRowT2[] => {
@@ -78,6 +80,8 @@ export default function MainApp() {
     // --- State ---
     const [data, setData] = useState<EmployeeInputRow[]>([]); 
     const [showHelp, setShowHelp] = useState<boolean>(false);
+    const [showApiSettings, setShowApiSettings] = useState<boolean>(false);
+    const [customApiKey, setCustomApiKey] = useState<string>(localStorage.getItem('custom_gemini_api_key') || '');
     
     // Deep Clone for independence
     const [configA, setConfigA] = useState<SimulationConfig>({ 
@@ -466,6 +470,27 @@ export default function MainApp() {
             setData([]); setAggregatedData([]); setSelectedEmployeeId(null); setSearchTerm(''); setStatus('待機中');
             setShowAnalysis(false);
         }
+    };
+
+    const handleLoadSampleData = () => {
+        setData(SAMPLE_EMPLOYEE_DATA);
+        setStatus('サンプルデータを読み込みました。再計算を実行してください。');
+    };
+
+    const handleCopyResults = () => {
+        if (aggregatedData.length === 0) {
+            setStatus('コピーする結果がありません');
+            return;
+        }
+        const totalA = aggregatedData.reduce((sum, d) => sum + d.A.total, 0);
+        const totalB = aggregatedData.reduce((sum, d) => sum + d.B.total, 0);
+        const diff = totalA - totalB;
+        const text = `【退職金シミュレーション結果】\nパターンA (変更案): ${Math.round(totalA).toLocaleString()}千円\nパターンB (現行制度): ${Math.round(totalB).toLocaleString()}千円\n差額: ${Math.round(diff).toLocaleString()}千円`;
+        navigator.clipboard.writeText(text).then(() => {
+            setStatus('結果をクリップボードにコピーしました');
+        }).catch(() => {
+            setStatus('クリップボードへのコピーに失敗しました');
+        });
     };
 
     const handleResetSettings = (target: 'A' | 'B') => {
@@ -962,6 +987,13 @@ export default function MainApp() {
                     <div className="flex flex-col items-end gap-2">
                          <div className="flex items-center gap-3">
                             <button 
+                                onClick={() => setShowApiSettings(true)}
+                                className="bg-white/10 hover:bg-white/20 text-indigo-100 hover:text-white px-4 py-2 rounded-lg text-base flex items-center gap-2 transition no-print font-bold"
+                            >
+                                <Key className="w-5 h-5"/>
+                                <span className="hidden sm:inline">API設定</span>
+                            </button>
+                            <button 
                                 onClick={() => setShowHelp(true)}
                                 className="bg-white/10 hover:bg-white/20 text-indigo-100 hover:text-white px-4 py-2 rounded-lg text-base flex items-center gap-2 transition no-print font-bold"
                             >
@@ -996,7 +1028,14 @@ export default function MainApp() {
                                         <Play className="w-8 h-8 fill-current"/> 再計算する
                                     </button>
                                 )}
-                                {/* Copy Button Removed */}
+                                {aggregatedData.length > 0 && (
+                                    <button 
+                                        onClick={handleCopyResults} 
+                                        className="flex items-center gap-2 bg-white text-slate-600 px-4 py-2 rounded-xl font-bold shadow-sm hover:bg-slate-50 border border-slate-200 transition-colors"
+                                    >
+                                        <Copy className="w-5 h-5"/> 結果をコピー
+                                    </button>
+                                )}
                             </div>
                         </div>
                         <div className="grid md:grid-cols-2 gap-8">
@@ -1038,7 +1077,7 @@ export default function MainApp() {
                                         </button>
                                     )}
                                     <button onClick={handleDownloadTemplate} className="text-sm px-3 py-1.5 text-slate-600 hover:bg-white rounded font-medium">テンプレートDL</button>
-                                    {/* Sample Load Removed */}
+                                    <button onClick={handleLoadSampleData} className="text-sm px-3 py-1.5 text-slate-600 hover:bg-white rounded font-medium">サンプル読込</button>
                                     <button onClick={handleClearData} className="text-sm px-3 py-1.5 text-red-500 hover:bg-red-50 rounded font-medium">クリア</button>
                                 </div>
                             </div>
@@ -1098,9 +1137,9 @@ export default function MainApp() {
                         </div>
                     )}
 
-                    {/* Section 3: Chart (Removed) */}
+                    {/* Section 3: Chart */}
                     <div className="border-t border-slate-200 pt-8">
-                        {/* <AnnualCostChart data={aggregatedData} /> */}
+                        <AnnualCostChart data={aggregatedData} />
                     </div>
                     
                     {/* Section 4: Individual Simulation */}
@@ -1129,7 +1168,7 @@ export default function MainApp() {
                     
                     {/* Section 5: AI Analysis Report */}
                     <div className="report-section">
-                        <AIAnalysisReport data={aggregatedData} />
+                        <AIAnalysisReport data={aggregatedData} customApiKey={customApiKey} />
                     </div>
 
                     {/* Footer / Info */}
@@ -1159,7 +1198,13 @@ export default function MainApp() {
                 {showHelp && (
                     <HelpModal onClose={() => setShowHelp(false)} />
                 )}
-                <ChatConsultant config={configA} aggregatedData={aggregatedData} />
+                <ApiSettingsModal 
+                    isOpen={showApiSettings} 
+                    onClose={() => setShowApiSettings(false)} 
+                    customApiKey={customApiKey} 
+                    setCustomApiKey={setCustomApiKey} 
+                />
+                <ChatConsultant config={configA} aggregatedData={aggregatedData} customApiKey={customApiKey} />
             </div>
         </div>
     );
