@@ -27,6 +27,20 @@ export const AIAnalysisReport: React.FC<AIAnalysisReportProps> = ({ data, custom
             const totalCostA = data.reduce((sum, d) => sum + d.A.total, 0);
             const totalCostB = data.reduce((sum, d) => sum + d.B.total, 0);
             
+            const totalType1A = data.reduce((sum, d) => sum + d.A.type1, 0);
+            const totalType2A = data.reduce((sum, d) => sum + d.A.type2, 0);
+            const totalType3A = data.reduce((sum, d) => sum + d.A.type3, 0);
+            const totalType4A = data.reduce((sum, d) => sum + d.A.type4, 0);
+
+            const totalType1B = data.reduce((sum, d) => sum + d.B.type1, 0);
+            const totalType2B = data.reduce((sum, d) => sum + d.B.type2, 0);
+            const totalType3B = data.reduce((sum, d) => sum + d.B.type3, 0);
+            const totalType4B = data.reduce((sum, d) => sum + d.B.type4, 0);
+
+            const peakYearB = data.reduce((max, d) => d.B.total > max.B.total ? d : max, data[0]);
+            const peakYearA = data.reduce((max, d) => d.A.total > max.A.total ? d : max, data[0]);
+            const maxDiffYear = data.reduce((max, d) => Math.abs(d.A.total - d.B.total) > Math.abs(max.A.total - max.B.total) ? d : max, data[0]);
+            
             const prompt = `
 以下の退職金シミュレーション結果（現行制度Bと変更案Aの比較）を分析し、経営者向けにレポートを作成してください。
 
@@ -36,11 +50,20 @@ export const AIAnalysisReport: React.FC<AIAnalysisReportProps> = ({ data, custom
 - 変更案(A)の総費用: ${Math.round(totalCostA).toLocaleString()} 千円
 - 差額(A - B): ${Math.round(totalCostA - totalCostB).toLocaleString()} 千円
 
+【制度区分別の総費用内訳（千円）】
+- 現行制度(B): 旧制度① ${Math.round(totalType1B).toLocaleString()}, 旧制度② ${Math.round(totalType2B).toLocaleString()}, 旧制度③ ${Math.round(totalType3B).toLocaleString()}, 新制度 ${Math.round(totalType4B).toLocaleString()}
+- 変更案(A): 旧制度① ${Math.round(totalType1A).toLocaleString()}, 旧制度② ${Math.round(totalType2A).toLocaleString()}, 旧制度③ ${Math.round(totalType3A).toLocaleString()}, 新制度 ${Math.round(totalType4A).toLocaleString()}
+
+【キャッシュフロー・財務リスク指標】
+- 現行制度(B)の支出ピーク年: ${peakYearB.year}年 (${Math.round(peakYearB.B.total).toLocaleString()} 千円)
+- 変更案(A)の支出ピーク年: ${peakYearA.year}年 (${Math.round(peakYearA.A.total).toLocaleString()} 千円)
+- 制度変更による単年度の最大乖離年: ${maxDiffYear.year}年 (差額: ${Math.round(maxDiffYear.A.total - maxDiffYear.B.total).toLocaleString()} 千円)
+
 レポートには以下の内容を含めてください：
-1. 全体的なコストインパクトの要約
-2. 長期的な推移の傾向
-3. 制度変更によるメリット・デメリットの考察
-4. 今後の検討課題
+1. 全体的なコストインパクトと制度区分別の影響分析（どの層に最も影響が出ているか）
+2. 将来のキャッシュフロー推移と財務リスクの評価（ピーク時の負担や資金繰りへの影響）
+3. 制度変更によるメリット・デメリットの深い考察
+4. 経営課題としての今後の対応方針（移行措置の必要性など）
 
 Markdown形式で見出しや箇条書きを使って分かりやすく記述してください。
 `;
