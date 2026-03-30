@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import Papa from 'papaparse';
+import JSZip from 'jszip';
+import { saveAs } from 'file-saver';
 import { 
     Calculator, Settings, Download, Upload, Search, 
     FileSpreadsheet, Loader2, AlertCircle, CheckCircle2, Sliders,
@@ -43,6 +45,7 @@ const convertT1toT2 = (t1: TableRowT1[]): TableRowT2[] => {
 // デフォルト設定
 const DEFAULT_CONFIG: Omit<SimulationConfig, 'label'> = {
     unitPrice: 10000,
+    masterDataSource: 'default',
     // 現行
     defaultYearlyEval: 0,
     retirementAges: { type1: 60, type2: 60, type3: 60, type4: 60 },
@@ -95,6 +98,7 @@ export default function MainApp() {
     const [error, setError] = useState<string | null>(null);
     const [progress, setProgress] = useState<number>(0);
     const [isCalculating, setIsCalculating] = useState<boolean>(false);
+    const [includeDetailedCsv, setIncludeDetailedCsv] = useState<boolean>(false);
     
     // Manual Trigger
     const [calcTrigger, setCalcTrigger] = useState<number>(0);
@@ -127,29 +131,35 @@ export default function MainApp() {
         targetB: number | undefined = undefined,
         targetReserve2026: number | undefined = undefined
     ) => {
+        const useDefault = config.masterDataSource === 'default';
         return processRow(
             row, 
-            config.masterData1_1, 
-            config.masterData1_2, 
-            config.masterData1_3, 
-            config.masterData2, 
-            config.masterDataFuture, // Pass future master
+            useDefault ? DEFAULT_TABLE_1_1 : config.masterData1_1, 
+            useDefault ? DEFAULT_TABLE_1_2 : config.masterData1_2, 
+            useDefault ? DEFAULT_TABLE_1_3 : config.masterData1_3, 
+            useDefault ? DEFAULT_TABLE_2 : config.masterData2, 
+            useDefault ? {
+                type1: convertT1toT2(DEFAULT_TABLE_1_1),
+                type2: convertT1toT2(DEFAULT_TABLE_1_2),
+                type3: convertT1toT2(DEFAULT_TABLE_1_3),
+                type4: DEFAULT_TABLE_2,
+            } : config.masterDataFuture,
             config.retirementAges, 
             config.cutoffYears, 
-            config.coefSettings, 
-            config.coefSettingsFuture, // Pass future coef
+            useDefault ? DEFAULT_COEF_SETTINGS : config.coefSettings, 
+            useDefault ? DEFAULT_COEF_SETTINGS : config.coefSettingsFuture, 
             config.defaultYearlyEval, 
             fractionConfig, 
             includeCurrentFiscalYear, 
             config.unitPrice,
-            config.transitionConfig, // Pass transition config
-            config.retirementAgesFuture, // New Future Params
-            config.cutoffYearsFuture, // New Future Params
-            config.defaultYearlyEvalFuture, // New Future Params
-            config.adjustmentConfig, // Adjustment Config
-            config.unifyNewSystemConfig, // Unify Config
-            targetB, // Target B Amount (for Adjustment Mode)
-            targetReserve2026 // Target B 2026 Amount
+            config.transitionConfig, 
+            config.retirementAgesFuture, 
+            config.cutoffYearsFuture, 
+            config.defaultYearlyEvalFuture, 
+            config.adjustmentConfig, 
+            config.unifyNewSystemConfig, 
+            targetB, 
+            targetReserve2026 
         );
     }, [fractionConfig, includeCurrentFiscalYear]);
 
@@ -676,16 +686,74 @@ export default function MainApp() {
                 return row;
             })];
 
+            let detailedData: any[][] = [];
+            if (includeDetailedCsv) {
+                const detailedHeaders = [
+                    "社員番号", "氏名", "年度", "年齢", "生年月日", "入社日", "勤続年数",
+                    "【A】勤続Pt増", "【A】資格Pt増", "【A】評価Pt増", "【A】調整Pt増", "【A】累計Pt", "【A】支給率", "【A】当年度費用",
+                    "【B】勤続Pt増", "【B】資格Pt増", "【B】評価Pt増", "【B】累計Pt", "【B】支給率", "【B】当年度費用",
+                    "当年度費用差分(A-B)"
+                ];
+                detailedData = [detailedHeaders];
+
+                results.forEach(({ resA, resB }) => {
+                    const years = new Set<number>();
+                    resA.yearlyDetails.forEach(d => years.add(d.year));
+                    resB.yearlyDetails.forEach(d => years.add(d.year));
+                    const sortedYears = Array.from(years).sort((a, b) => a - b);
+
+                    sortedYears.forEach(year => {
+                        const dA = resA.yearlyDetails.find(d => d.year === year);
+                        const dB = resB.yearlyDetails.find(d => d.year === year);
+                        const age = dA ? dA.age : (dB ? dB.age : '');
+                        const yos = calculatePeriodYears(resA.joinDate, new Date(year, 3, 1));
+
+                        detailedData.push([
+                            resA.employeeId, resA.name, year, age, formatDateWithWareki(resA.birthDate), formatDateWithWareki(resA.joinDate), yos,
+                            dA ? dA.losPtInc : 0, dA ? dA.rankPtInc : 0, dA ? dA.evalPtInc : 0, dA ? dA.adjustmentPtInc : 0, dA ? dA.totalPt : 0, dA ? dA.coef : 0, dA ? dA.amountInc : 0,
+                            dB ? dB.losPtInc : 0, dB ? dB.rankPtInc : 0, dB ? dB.evalPtInc : 0, dB ? dB.totalPt : 0, dB ? dB.coef : 0, dB ? dB.amountInc : 0,
+                            (dA ? dA.amountInc : 0) - (dB ? dB.amountInc : 0)
+                        ]);
+                    });
+                });
+            }
+
             if (format === 'csv') {
-                const csv = Papa.unparse(outData);
-                const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csv], { type: 'text/csv;charset=utf-8;' });
-                const link = document.createElement("a");
-                link.href = URL.createObjectURL(blob);
-                link.download = filename;
-                link.click();
+                if (includeDetailedCsv) {
+                    const zip = new JSZip();
+                    const encoder = new TextEncoder();
+                    const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
+                    
+                    const aggregatedCsv = Papa.unparse(outData);
+                    const aggregatedBytes = encoder.encode(aggregatedCsv);
+                    const aggregatedWithBom = new Uint8Array(bom.length + aggregatedBytes.length);
+                    aggregatedWithBom.set(bom);
+                    aggregatedWithBom.set(aggregatedBytes, bom.length);
+                    zip.file(`比較結果_集計_${timestamp}.csv`, aggregatedWithBom);
+                    
+                    const detailedCsv = Papa.unparse(detailedData);
+                    const detailedBytes = encoder.encode(detailedCsv);
+                    const detailedWithBom = new Uint8Array(bom.length + detailedBytes.length);
+                    detailedWithBom.set(bom);
+                    detailedWithBom.set(detailedBytes, bom.length);
+                    zip.file(`比較結果_個人別詳細_${timestamp}.csv`, detailedWithBom);
+                    
+                    const content = await zip.generateAsync({ type: 'blob' });
+                    saveAs(content, `退職金シミュレーション_${timestamp}.zip`);
+                } else {
+                    const csv = Papa.unparse(outData);
+                    const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csv], { type: 'text/csv;charset=utf-8;' });
+                    const link = document.createElement("a");
+                    link.href = URL.createObjectURL(blob);
+                    link.download = filename;
+                    link.click();
+                }
             } else {
                 const wb = XLSX.utils.book_new();
                 XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(outData), "比較結果");
+                if (includeDetailedCsv) {
+                    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(detailedData), "個人別詳細");
+                }
                 XLSX.writeFile(wb, filename);
             }
             setStatus('完了'); setProgress(100);
@@ -1199,14 +1267,36 @@ export default function MainApp() {
 
                             <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-center items-center gap-3">
                                 <p className="text-sm text-slate-500 font-bold">パターンAとBの結果をまとめて出力します</p>
-                                <button 
-                                    onClick={() => handleCalculateAndExport('xlsx')} 
-                                    disabled={isCalculating || data.length === 0}
-                                    className={`w-full max-w-sm flex items-center justify-center gap-3 px-6 py-4 rounded-xl font-bold text-lg text-white shadow-md transition ${isCalculating || data.length === 0 ? 'bg-slate-400 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700'}`}
-                                >
-                                    {isCalculating ? <Loader2 className="w-5 h-5 animate-spin"/> : <FileSpreadsheet className="w-5 h-5"/>} 
-                                    比較結果をExcel出力
-                                </button>
+                                <div className="flex flex-col sm:flex-row gap-3 w-full max-w-md">
+                                    <button 
+                                        onClick={() => handleCalculateAndExport('xlsx')} 
+                                        disabled={isCalculating || data.length === 0}
+                                        className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-bold text-white shadow-md transition ${isCalculating || data.length === 0 ? 'bg-slate-400 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700'}`}
+                                    >
+                                        {isCalculating ? <Loader2 className="w-5 h-5 animate-spin"/> : <FileSpreadsheet className="w-5 h-5"/>} 
+                                        Excel出力
+                                    </button>
+                                    <button 
+                                        onClick={() => handleCalculateAndExport('csv')} 
+                                        disabled={isCalculating || data.length === 0}
+                                        className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-bold text-white shadow-md transition ${isCalculating || data.length === 0 ? 'bg-slate-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
+                                    >
+                                        {isCalculating ? <Loader2 className="w-5 h-5 animate-spin"/> : <Download className="w-5 h-5"/>} 
+                                        CSV出力
+                                    </button>
+                                </div>
+                                <div className="flex items-center gap-2 mt-2">
+                                    <input 
+                                        type="checkbox" 
+                                        id="includeDetailedCsv" 
+                                        checked={includeDetailedCsv} 
+                                        onChange={(e) => setIncludeDetailedCsv(e.target.checked)}
+                                        className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
+                                    />
+                                    <label htmlFor="includeDetailedCsv" className="text-sm text-slate-600 cursor-pointer font-medium">
+                                        個人別の年度別詳細データも含める (CSV/Excel出力時)
+                                    </label>
+                                </div>
                             </div>
                         </div>
                     </div>

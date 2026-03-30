@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { 
     X, HelpCircle, BookOpen, FileSpreadsheet, Settings, 
     Calculator, ArrowRightLeft, BarChart3, UserSearch, 
-    Bot, Database, AlertTriangle 
+    Bot, Database, AlertTriangle, Download, Upload
 } from 'lucide-react';
 
 interface HelpModalProps {
@@ -17,12 +17,13 @@ export const HelpModal: React.FC<HelpModalProps> = ({ onClose }) => {
         { id: 'data', icon: FileSpreadsheet, title: '2. 事前準備とデータ仕様' },
         { id: 'flow', icon: HelpCircle, title: '3. 基本的な操作フロー' },
         { id: 'settings', icon: Settings, title: '4. シミュレーション設定詳細' },
-        { id: 'logic', icon: Calculator, title: '5. ポイント計算ロジック' },
-        { id: 'transition', icon: ArrowRightLeft, title: '6. 制度移行と調整措置' },
-        { id: 'analysis', icon: BarChart3, title: '7. 結果分析とグラフの見方' },
-        { id: 'individual', icon: UserSearch, title: '8. 個人別シミュレーション' },
-        { id: 'ai', icon: Bot, title: '9. AIコンサルタントの活用' },
-        { id: 'faq', icon: AlertTriangle, title: '10. FAQ・トラブルシューティング' },
+        { id: 'master', icon: Database, title: '5. マスタデータのカスタマイズ' },
+        { id: 'logic', icon: Calculator, title: '6. ポイント計算ロジック' },
+        { id: 'transition', icon: ArrowRightLeft, title: '7. 制度移行と調整措置' },
+        { id: 'analysis', icon: BarChart3, title: '8. 結果分析とグラフの見方' },
+        { id: 'individual', icon: UserSearch, title: '9. 個人別シミュレーション' },
+        { id: 'ai', icon: Bot, title: '10. AIコンサルタントの活用' },
+        { id: 'faq', icon: AlertTriangle, title: '11. FAQ・トラブルシューティング' },
     ];
 
     return (
@@ -83,12 +84,13 @@ export const HelpModal: React.FC<HelpModalProps> = ({ onClose }) => {
                                         高年齢者雇用安定法の改正に伴い、多くの企業で65歳定年制の導入が検討されています。しかし、単純に定年を延長した場合、退職金の支給総額が想定以上に膨れ上がる「退職金リスク」が懸念されます。本システムは、現行制度（パターンB）と新たな制度案（パターンA）を並行して計算し、その差額を可視化することで、経営層の迅速な意思決定を支援します。
                                     </p>
 
-                                    <h3 className="text-xl font-bold text-slate-800 mt-8 mb-4">1.2. 主な機能と特徴</h3>
+                                    <h3 className="text-xl font-bold text-slate-800 mt-8 mb-4">1.2. 主な機能と特徴（最新アップデート対応）</h3>
                                     <ul className="space-y-3 text-slate-600">
                                         <li className="flex items-start gap-2"><div className="w-1.5 h-1.5 rounded-full bg-indigo-500 mt-2 shrink-0"></div><span><strong>ポイント制退職金への完全対応:</strong> 勤続ポイント、資格（等級）ポイント、評価ポイントの3軸を組み合わせた複雑な計算ロジックに対応。</span></li>
+                                        <li className="flex items-start gap-2"><div className="w-1.5 h-1.5 rounded-full bg-indigo-500 mt-2 shrink-0"></div><span><strong>マスタデータのExcel連携 <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded ml-1">NEW</span>:</strong> ポイント付与テーブルや支給率表をExcelでダウンロード・編集・アップロード可能になり、独自の制度設計を簡単に反映できます。</span></li>
                                         <li className="flex items-start gap-2"><div className="w-1.5 h-1.5 rounded-full bg-indigo-500 mt-2 shrink-0"></div><span><strong>リアルタイム・シミュレーション:</strong> パラメータ（定年年齢、ポイント単価、支給乗率など）を変更すると、即座に全社員の将来退職金が再計算され、グラフに反映されます。</span></li>
+                                        <li className="flex items-start gap-2"><div className="w-1.5 h-1.5 rounded-full bg-indigo-500 mt-2 shrink-0"></div><span><strong>高度なデータエクスポート <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded ml-1">NEW</span>:</strong> 全体のサマリーだけでなく、社員ごとの「毎年のポイント推移・金額推移」を網羅した詳細な明細データをCSV/Excel形式で一括出力可能です。</span></li>
                                         <li className="flex items-start gap-2"><div className="w-1.5 h-1.5 rounded-full bg-indigo-500 mt-2 shrink-0"></div><span><strong>AIコンサルタント連携:</strong> 最新の生成AI（Gemini 3.1 Pro）を搭載し、計算結果の財務的インパクト分析や、制度設計に関する労務相談をチャット形式で実施可能です。</span></li>
-                                        <li className="flex items-start gap-2"><div className="w-1.5 h-1.5 rounded-full bg-indigo-500 mt-2 shrink-0"></div><span><strong>個人別ドリルダウン:</strong> マクロな財務予測だけでなく、特定の社員を検索し、「A案とB案で個人の退職金がどう変わるか」をミクロな視点で検証できます。</span></li>
                                     </ul>
                                 </section>
                             )}
@@ -142,7 +144,7 @@ export const HelpModal: React.FC<HelpModalProps> = ({ onClose }) => {
                                 <section className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                                     <h1 className="text-3xl font-bold text-slate-800 mb-6 border-b-2 border-indigo-100 pb-4">3. 基本的な操作フロー</h1>
                                     <p className="text-slate-600 leading-relaxed mb-6">
-                                        本システムは、以下の4つのステップでシミュレーションを実施します。直感的なUIにより、専門的な知識がなくても高度な分析が可能です。
+                                        本システムは、以下のステップでシミュレーションを実施します。直感的なUIにより、専門的な知識がなくても高度な分析が可能です。
                                     </p>
 
                                     <div className="space-y-8 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-slate-300 before:to-transparent">
@@ -157,16 +159,16 @@ export const HelpModal: React.FC<HelpModalProps> = ({ onClose }) => {
                                         <div className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
                                             <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-white bg-indigo-600 text-white font-bold shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10">2</div>
                                             <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-                                                <h3 className="font-bold text-slate-800 text-lg mb-1">現行制度（パターンB）の確認</h3>
-                                                <p className="text-sm text-slate-600">まずは右側の「パターンB」パネルで、現在の会社の定年年齢やポイント単価が正しく設定されているか確認します。これが比較のベースラインとなります。</p>
+                                                <h3 className="font-bold text-slate-800 text-lg mb-1">マスタデータの設定（任意）</h3>
+                                                <p className="text-sm text-slate-600">必要に応じて「マスタ編集」ボタンから、自社のポイント付与テーブルや支給率表をExcelでアップロードし、システムに反映させます。</p>
                                             </div>
                                         </div>
 
                                         <div className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
                                             <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-white bg-indigo-600 text-white font-bold shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10">3</div>
                                             <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-                                                <h3 className="font-bold text-slate-800 text-lg mb-1">変更案（パターンA）の設定</h3>
-                                                <p className="text-sm text-slate-600">左側の「パターンA」パネルで、定年延長（例: 60歳→65歳）や、ポイント付与の上限年齢（頭打ち年齢）の変更を行います。設定を変更するたびにグラフがリアルタイムで更新されます。</p>
+                                                <h3 className="font-bold text-slate-800 text-lg mb-1">現行制度と変更案の設定</h3>
+                                                <p className="text-sm text-slate-600">「パターンB（現行制度）」と「パターンA（変更案）」のパネルで、定年年齢や頭打ち年齢、ポイント単価などを設定します。設定を変更するたびにグラフがリアルタイムで更新されます。</p>
                                             </div>
                                         </div>
 
@@ -174,7 +176,7 @@ export const HelpModal: React.FC<HelpModalProps> = ({ onClose }) => {
                                             <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-white bg-indigo-600 text-white font-bold shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10">4</div>
                                             <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
                                                 <h3 className="font-bold text-slate-800 text-lg mb-1">分析とエクスポート</h3>
-                                                <p className="text-sm text-slate-600">グラフで将来のコスト推移を確認し、必要に応じて「AI分析レポート」を生成します。最終的な計算結果は「Excel出力」ボタンからダウンロードし、社内稟議等の資料として活用します。</p>
+                                                <p className="text-sm text-slate-600">グラフで将来のコスト推移を確認します。必要に応じて「個人別明細を含める」にチェックを入れ、「Excel出力」または「CSV出力」ボタンから詳細な計算結果をダウンロードします。</p>
                                             </div>
                                         </div>
                                     </div>
@@ -227,7 +229,47 @@ export const HelpModal: React.FC<HelpModalProps> = ({ onClose }) => {
 
                             {activeTab === 4 && (
                                 <section className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                    <h1 className="text-3xl font-bold text-slate-800 mb-6 border-b-2 border-indigo-100 pb-4">5. ポイント計算ロジック</h1>
+                                    <h1 className="text-3xl font-bold text-slate-800 mb-6 border-b-2 border-indigo-100 pb-4">5. マスタデータのカスタマイズ</h1>
+                                    <p className="text-slate-600 leading-relaxed mb-6">
+                                        本システムでは、企業独自の複雑なポイント付与テーブルや自己都合減額率（支給率）テーブルを、Excelファイルを用いて簡単に取り込むことができます。
+                                    </p>
+
+                                    <h3 className="text-xl font-bold text-slate-800 mt-8 mb-4">5.1. マスタ編集画面へのアクセス</h3>
+                                    <p className="text-slate-600 mb-4">
+                                        コントロールパネルの各パターン（A案・B案）の右上にある「マスタ編集」ボタンをクリックすると、マスタデータ設定モーダルが開きます。
+                                    </p>
+
+                                    <h3 className="text-xl font-bold text-slate-800 mt-8 mb-4">5.2. Excel連携の手順</h3>
+                                    <div className="bg-slate-50 p-6 rounded-xl border border-slate-200 mb-6">
+                                        <ol className="list-decimal list-inside text-slate-700 space-y-4">
+                                            <li>
+                                                <strong>設定方法の変更:</strong> モーダル内のドロップダウンから「スプレッドシート(Excel)から読み込み」を選択します。
+                                            </li>
+                                            <li>
+                                                <strong>テンプレートのダウンロード:</strong> <Download className="w-4 h-4 inline text-slate-500 mx-1" />「テンプレートDL」ボタンをクリックし、現在の設定が反映されたExcelファイル（.xlsx）をダウンロードします。
+                                            </li>
+                                            <li>
+                                                <strong>Excelでの編集:</strong> ダウンロードしたファイルを開き、各シート（旧制度1、新制度、支給率など）の数値を自社の規定に合わせて書き換えます。※シート名や列の構造は変更しないでください。
+                                            </li>
+                                            <li>
+                                                <strong>ファイルのアップロード:</strong> <Upload className="w-4 h-4 inline text-slate-500 mx-1" />「Excelアップロード」ボタンから、編集済みのExcelファイルを選択して読み込ませます。
+                                            </li>
+                                            <li>
+                                                <strong>完了:</strong> 読み込み成功のメッセージが出たら「完了」ボタンを押して画面を閉じます。以降のシミュレーションは、アップロードした独自のマスタデータに基づいて計算されます。
+                                            </li>
+                                        </ol>
+                                    </div>
+                                    
+                                    <div className="p-4 bg-indigo-50 text-indigo-800 rounded-lg text-sm">
+                                        <strong>※ パターンA（変更案）特有のシートについて：</strong><br/>
+                                        パターンAのテンプレートには、「移行後_新制度」や「移行後_支給率」といったシートが含まれます。これは、制度移行のタイミングでポイント付与率そのものを変更するシミュレーションを行うためのものです。
+                                    </div>
+                                </section>
+                            )}
+
+                            {activeTab === 5 && (
+                                <section className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                    <h1 className="text-3xl font-bold text-slate-800 mb-6 border-b-2 border-indigo-100 pb-4">6. ポイント計算ロジック</h1>
                                     <p className="text-slate-600 leading-relaxed mb-6">
                                         本システムは、日本企業の退職金制度で最も一般的な「ポイント制退職金」のアルゴリズムを忠実に再現しています。退職金は以下の3つのポイントの累計によって決定されます。
                                     </p>
@@ -247,7 +289,7 @@ export const HelpModal: React.FC<HelpModalProps> = ({ onClose }) => {
                                         </div>
                                     </div>
 
-                                    <h3 className="text-xl font-bold text-slate-800 mt-8 mb-4">5.1. 将来推計のアルゴリズム</h3>
+                                    <h3 className="text-xl font-bold text-slate-800 mt-8 mb-4">6.1. 将来推計のアルゴリズム</h3>
                                     <p className="text-slate-600 mb-4">
                                         システムは、インポートされた各社員の「現在年齢」から「設定された定年年齢」までの期間について、毎年ループ処理を行い将来ポイントを推計します。
                                     </p>
@@ -266,14 +308,14 @@ export const HelpModal: React.FC<HelpModalProps> = ({ onClose }) => {
                                 </section>
                             )}
 
-                            {activeTab === 5 && (
+                            {activeTab === 6 && (
                                 <section className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                    <h1 className="text-3xl font-bold text-slate-800 mb-6 border-b-2 border-indigo-100 pb-4">6. 制度移行と調整措置</h1>
+                                    <h1 className="text-3xl font-bold text-slate-800 mb-6 border-b-2 border-indigo-100 pb-4">7. 制度移行と調整措置</h1>
                                     <p className="text-slate-600 leading-relaxed mb-6">
                                         退職金制度を不利益変更（社員にとって不利になる変更）する場合、法的な観点から「既得権の保護」や「激変緩和措置」が必須となります。本システムでは、これらの移行措置を正確にシミュレーションできます。
                                     </p>
 
-                                    <h3 className="text-xl font-bold text-slate-800 mt-8 mb-4">6.1. 既得権の保護（2026年時点の確定）</h3>
+                                    <h3 className="text-xl font-bold text-slate-800 mt-8 mb-4">7.1. 既得権の保護（2026年時点の確定）</h3>
                                     <p className="text-slate-600 mb-4">
                                         新制度（パターンA）へ移行する際、過去の労働に対する対価である「現時点（例: 2026年）までに貯まった退職金」は既得権として保護され、減額されることはありません。
                                     </p>
@@ -281,45 +323,48 @@ export const HelpModal: React.FC<HelpModalProps> = ({ onClose }) => {
                                         システム内では、インポートされた <code>losPoints</code>, <code>rankPoints</code>, <code>evalPoints</code> の合計を「移行時既得ポイント」として保持し、新制度の計算のベースとして引き継ぎます。
                                     </p>
 
-                                    <h3 className="text-xl font-bold text-slate-800 mt-8 mb-4">6.2. 調整給（調整ポイント）の付与</h3>
+                                    <h3 className="text-xl font-bold text-slate-800 mt-8 mb-4">7.2. 調整給（調整ポイント）の付与</h3>
                                     <p className="text-slate-600 mb-4">
                                         新制度に移行することで、旧制度のまま定年を迎えた場合（パターンB）と比較して、将来の退職金が大幅に減少する社員が発生する場合があります。これを緩和するための措置です。
                                     </p>
                                     <div className="bg-white border border-slate-200 rounded-lg p-5 shadow-sm mb-6">
                                         <h4 className="font-bold text-slate-800 mb-2">シミュレーション上の挙動</h4>
                                         <p className="text-sm text-slate-600">
-                                            パターンAの設定で「調整措置を有効にする」等のフラグ（今後のアップデートでUI実装予定）をオンにした場合、システムはバックグラウンドでパターンAとパターンBの両方を計算し、その差額が一定割合（例: 10%以上の減少）を超える社員に対して、差額を埋めるための「調整ポイント」を自動的に付与して再計算を行います。
+                                            パターンAの設定で「調整措置を有効にする」等のフラグをオンにした場合、システムはバックグラウンドでパターンAとパターンBの両方を計算し、その差額が一定割合（例: 10%以上の減少）を超える社員に対して、差額を埋めるための「調整ポイント」を自動的に付与して再計算を行います。
                                         </p>
                                     </div>
 
-                                    <h3 className="text-xl font-bold text-slate-800 mt-8 mb-4">6.3. 役職定年によるポイント減額</h3>
+                                    <h3 className="text-xl font-bold text-slate-800 mt-8 mb-4">7.3. 役職定年によるポイント減額</h3>
                                     <p className="text-slate-600 mb-4">
                                         定年延長に伴い、55歳や60歳で「役職定年」を迎え、等級が下がる（またはポイント付与率が下がる）ケースのシミュレーションです。マスタデータの「年齢別係数表」を編集することで、特定の年齢以降の付与ポイントを 70% や 50% に減額する設定が可能です。
                                     </p>
                                 </section>
                             )}
 
-                            {activeTab === 6 && (
+                            {activeTab === 7 && (
                                 <section className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                    <h1 className="text-3xl font-bold text-slate-800 mb-6 border-b-2 border-indigo-100 pb-4">7. 結果分析とグラフの見方</h1>
+                                    <h1 className="text-3xl font-bold text-slate-800 mb-6 border-b-2 border-indigo-100 pb-4">8. 結果分析とグラフの見方</h1>
                                     <p className="text-slate-600 leading-relaxed mb-6">
                                         シミュレーション結果は、経営陣へのプレゼンテーションにそのまま使用できる視覚的なグラフと、詳細な数値テーブルで出力されます。
                                     </p>
 
-                                    <h3 className="text-xl font-bold text-slate-800 mt-8 mb-4">7.1. 将来コスト推移グラフ（棒グラフ・折れ線グラフ）</h3>
+                                    <h3 className="text-xl font-bold text-slate-800 mt-8 mb-4">8.1. 将来コスト推移グラフ（棒グラフ・折れ線グラフ）</h3>
                                     <div className="bg-slate-50 p-6 rounded-xl border border-slate-200 mb-6">
                                         <ul className="space-y-4 text-slate-700">
                                             <li>
-                                                <strong className="text-indigo-600">X軸（横軸）:</strong> 将来の年度（Year）を表します。通常、現在から20〜30年先までプロットされます。
+                                                <strong className="text-indigo-600">X軸（横軸）:</strong> 将来の年度（Year）を表します。画面内には10年分が表示され、11年目以降は<strong>左右にスクロール</strong>して確認できます。
                                             </li>
                                             <li>
-                                                <strong className="text-indigo-600">Y軸（縦軸）:</strong> その年度に発生する退職金の「キャッシュアウト（支払額）」の合計を表します。単位は千円または百万円です。
+                                                <strong className="text-indigo-600">Y軸（縦軸）:</strong> その年度に発生する退職金の「キャッシュアウト（支払額）」の合計を表します。
                                             </li>
                                             <li>
-                                                <strong className="text-indigo-600">青色のバー（パターンA）:</strong> 新制度案を導入した場合のコスト推移です。
+                                                <strong className="text-indigo-600">濃い色のバー（パターンA）:</strong> 新制度案（変更案）を導入した場合のコスト推移です。
                                             </li>
                                             <li>
-                                                <strong className="text-indigo-600">灰色のバー（パターンB）:</strong> 現行制度を維持した場合のコスト推移です。
+                                                <strong className="text-indigo-600">淡い色のバー（パターンB）:</strong> 現行制度を維持した場合のコスト推移です。
+                                            </li>
+                                            <li>
+                                                <strong className="text-red-600">赤い折れ線:</strong> 「変更案 - 現行制度」の差額を示します。
                                             </li>
                                         </ul>
                                     </div>
@@ -327,26 +372,21 @@ export const HelpModal: React.FC<HelpModalProps> = ({ onClose }) => {
                                         <strong>分析のポイント：</strong> 定年を60歳から65歳に延長した場合、直近5年間の退職者がゼロになるため、グラフ上では「直近のキャッシュアウトが消滅し、5年後に巨大な山（ピーク）が移動する」という特徴的な波形が観察されます。このピーク時の資金繰り（キャッシュフロー）に耐えられるかが、経営上の重要な判断材料となります。
                                     </p>
 
-                                    <h3 className="text-xl font-bold text-slate-800 mt-8 mb-4">7.2. 年度別集計テーブル</h3>
+                                    <h3 className="text-xl font-bold text-slate-800 mt-8 mb-4">8.2. グラフデータのエクスポート</h3>
                                     <p className="text-slate-600 mb-4">
-                                        グラフの下部には、年度ごとの具体的な数値を表形式で表示しています。
+                                        グラフ右上の「Excel出力」ボタンをクリックすると、グラフの描画に使用されている年度ごとの集計データ（現行制度・変更案それぞれの内訳と差額）をExcel形式でダウンロードできます。報告書の作成等にご活用ください。
                                     </p>
-                                    <ul className="list-disc list-inside text-slate-600 space-y-2">
-                                        <li><strong>退職者数:</strong> その年度に定年退職を迎える人数の予測。</li>
-                                        <li><strong>総費用（A/B）:</strong> その年度の退職金支払総額。</li>
-                                        <li><strong>差額:</strong> パターンAとパターンBのコスト差。プラスの場合は新制度の方がコスト増、マイナスの場合はコスト減を意味します。</li>
-                                    </ul>
                                 </section>
                             )}
 
-                            {activeTab === 7 && (
+                            {activeTab === 8 && (
                                 <section className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                    <h1 className="text-3xl font-bold text-slate-800 mb-6 border-b-2 border-indigo-100 pb-4">8. 個人別シミュレーション</h1>
+                                    <h1 className="text-3xl font-bold text-slate-800 mb-6 border-b-2 border-indigo-100 pb-4">9. 個人別シミュレーション</h1>
                                     <p className="text-slate-600 leading-relaxed mb-6">
                                         マクロな全体コストの把握だけでなく、「特定の社員にとって、制度変更がどのような影響を与えるか」をミクロな視点で検証することは、社員への制度説明（従業員代表との交渉など）において非常に重要です。
                                     </p>
 
-                                    <h3 className="text-xl font-bold text-slate-800 mt-8 mb-4">8.1. 個人検索機能の使い方</h3>
+                                    <h3 className="text-xl font-bold text-slate-800 mt-8 mb-4">9.1. 個人検索機能の使い方</h3>
                                     <ol className="list-decimal list-inside text-slate-600 space-y-4 mb-8 bg-slate-50 p-6 rounded-lg border border-slate-200">
                                         <li>画面下部の「個人別シミュレーション比較」セクションにスクロールします。</li>
                                         <li>検索ボックスに、確認したい社員の<strong>「社員番号」</strong>または<strong>「氏名の一部」</strong>を入力します。</li>
@@ -354,7 +394,7 @@ export const HelpModal: React.FC<HelpModalProps> = ({ onClose }) => {
                                         <li>該当する社員が見つかると、詳細な比較カード（ResultCard）が表示されます。</li>
                                     </ol>
 
-                                    <h3 className="text-xl font-bold text-slate-800 mt-8 mb-4">8.2. 比較カード（ResultCard）の見方</h3>
+                                    <h3 className="text-xl font-bold text-slate-800 mt-8 mb-4">9.2. 比較カード（ResultCard）の見方</h3>
                                     <div className="border border-slate-200 rounded-xl p-6 shadow-sm relative overflow-hidden mb-6">
                                         <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500"></div>
                                         <h4 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
@@ -369,21 +409,34 @@ export const HelpModal: React.FC<HelpModalProps> = ({ onClose }) => {
                                             <li><strong>差額（インパクト）:</strong> 新制度になることで、この社員の退職金が「いくら増えるか（または減るか）」。赤字で表示される場合は不利益変更となっているため、前述の「調整措置」の対象とするか検討が必要です。</li>
                                         </ul>
                                     </div>
-                                    
-                                    <p className="text-slate-600">
-                                        <strong>活用シーン：</strong> 労働組合や従業員代表への説明会資料の作成時や、モデルケース（標準的な大卒総合職、高卒技能職など）の抽出に活用します。
+
+                                    <h3 className="text-xl font-bold text-slate-800 mt-8 mb-4">9.3. 個人別明細のデータエクスポート</h3>
+                                    <p className="text-slate-600 mb-4">
+                                        画面下部のエクスポート機能において、<strong>「個人別の毎年のポイント・金額推移（明細）を含める」</strong>にチェックを入れてExcelまたはCSV出力を行うと、全社員の将来にわたる毎年の詳細なシミュレーション結果を一括でダウンロードできます。
+                                    </p>
+                                    <p className="text-slate-600 mb-4">
+                                        出力される明細データには、各年度における以下の情報が含まれます。
+                                    </p>
+                                    <ul className="list-disc list-inside text-slate-600 space-y-2 mb-6 ml-4">
+                                        <li>社員番号、氏名、生年月日、入社日</li>
+                                        <li>その年度時点での年齢、勤続年数</li>
+                                        <li>パターンA・Bそれぞれの累計ポイントと退職金見込額</li>
+                                        <li>パターンAとBの差額</li>
+                                    </ul>
+                                    <p className="text-sm text-slate-500">
+                                        ※ 全社員×数十年分のデータとなるため、人数が多い場合は出力ファイルのサイズが大きくなる（CSVの場合はZIP形式で圧縮されます）点にご注意ください。
                                     </p>
                                 </section>
                             )}
 
-                            {activeTab === 8 && (
+                            {activeTab === 9 && (
                                 <section className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                    <h1 className="text-3xl font-bold text-slate-800 mb-6 border-b-2 border-indigo-100 pb-4">9. AIコンサルタントの活用</h1>
+                                    <h1 className="text-3xl font-bold text-slate-800 mb-6 border-b-2 border-indigo-100 pb-4">10. AIコンサルタントの活用</h1>
                                     <p className="text-slate-600 leading-relaxed mb-6">
                                         本システムには、Googleの最新生成AIモデル「Gemini 3.1 Pro」を活用した「AI人事労務コンサルタント」機能が搭載されています。複雑なデータ分析や、制度設計の壁打ち相手として活用できます。
                                     </p>
 
-                                    <h3 className="text-xl font-bold text-slate-800 mt-8 mb-4">9.1. AI分析レポートの自動生成</h3>
+                                    <h3 className="text-xl font-bold text-slate-800 mt-8 mb-4">10.1. AI分析レポートの自動生成</h3>
                                     <p className="text-slate-600 mb-4">
                                         画面下部の「AI分析レポート」セクションにある「レポートを生成」ボタンをクリックすると、現在のシミュレーション結果（A案とB案のコスト差、年度別の推移データ）がAIに送信されます。
                                     </p>
@@ -391,7 +444,7 @@ export const HelpModal: React.FC<HelpModalProps> = ({ onClose }) => {
                                         AIは数秒でデータを解析し、<strong>経営会議にそのまま提出できるレベルのサマリーレポート</strong>（コストインパクトの要約、長期的なリスク、メリット・デメリット、今後の検討課題）をMarkdown形式で出力します。
                                     </p>
 
-                                    <h3 className="text-xl font-bold text-slate-800 mt-8 mb-4">9.2. チャットコンサルタント機能</h3>
+                                    <h3 className="text-xl font-bold text-slate-800 mt-8 mb-4">10.2. チャットコンサルタント機能</h3>
                                     <p className="text-slate-600 mb-4">
                                         画面右下のフローティングボタン（チャットアイコン）をクリックすると、AIコンサルタントとの対話ウィンドウが開きます。AIは現在のシミュレーション設定（定年年齢やポイント単価など）をコンテキストとして理解した上で回答します。
                                     </p>
@@ -419,9 +472,9 @@ export const HelpModal: React.FC<HelpModalProps> = ({ onClose }) => {
                                 </section>
                             )}
 
-                            {activeTab === 9 && (
+                            {activeTab === 10 && (
                                 <section className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                    <h1 className="text-3xl font-bold text-slate-800 mb-6 border-b-2 border-indigo-100 pb-4">10. FAQ・トラブルシューティング</h1>
+                                    <h1 className="text-3xl font-bold text-slate-800 mb-6 border-b-2 border-indigo-100 pb-4">11. FAQ・トラブルシューティング</h1>
                                     
                                     <div className="space-y-6">
                                         <div className="bg-white border border-slate-200 rounded-lg p-5 shadow-sm">
@@ -446,6 +499,16 @@ export const HelpModal: React.FC<HelpModalProps> = ({ onClose }) => {
                                             </h3>
                                             <div className="text-slate-600 text-sm space-y-2">
                                                 <p><span className="font-bold text-slate-500">A.</span> パラメータ設定の「ポイント単価（Unit Price）」を確認してください。単価が「1円」になっているか、「10,000円」になっているかで結果が大きく変わります。また、マスタデータのポイント付与テーブルが正しく設定されているか（MasterEditorModalから確認可能）も併せてご確認ください。</p>
+                                            </div>
+                                        </div>
+
+                                        <div className="bg-white border border-slate-200 rounded-lg p-5 shadow-sm">
+                                            <h3 className="font-bold text-slate-800 text-lg mb-2 flex items-center gap-2">
+                                                <span className="text-indigo-600">Q.</span>
+                                                マスタデータのExcelアップロードが反映されません。
+                                            </h3>
+                                            <div className="text-slate-600 text-sm space-y-2">
+                                                <p><span className="font-bold text-slate-500">A.</span> マスタ編集画面のドロップダウンで「スプレッドシート(Excel)から読み込み」が選択されていることを確認してください。「システム標準設定を使用」が選ばれていると、アップロードしたデータは無視されます。また、アップロードするExcelのシート名（「旧制度1」「新制度」など）がテンプレートと完全に一致している必要があります。</p>
                                             </div>
                                         </div>
 

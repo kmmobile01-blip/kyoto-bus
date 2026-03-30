@@ -1,14 +1,30 @@
 import React, { useState } from 'react';
-import { Settings } from 'lucide-react';
+import { Settings, Download } from 'lucide-react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Line, ComposedChart,
   AreaChart, Area, LineChart
 } from 'recharts';
+import * as XLSX from 'xlsx';
 import { AggregatedYearlyData } from '../types';
 
 interface AnnualCostChartProps {
   data: AggregatedYearlyData[];
 }
+
+const CHART_COLORS = {
+  B: { // 現行制度 (淡い色)
+    type1: '#93c5fd', // blue-300
+    type2: '#6ee7b7', // emerald-300
+    type3: '#fcd34d', // amber-300
+    type4: '#fca5a5', // red-300
+  },
+  A: { // 変更案 (濃い色)
+    type1: '#1d4ed8', // blue-700
+    type2: '#047857', // emerald-700
+    type3: '#b45309', // amber-700
+    type4: '#b91c1c', // red-700
+  }
+};
 
 export const AnnualCostChart: React.FC<AnnualCostChartProps> = ({ data }) => {
   const [chartType, setChartType] = useState<'bar' | 'area' | 'line'>('bar');
@@ -37,6 +53,28 @@ export const AnnualCostChart: React.FC<AnnualCostChartProps> = ({ data }) => {
     'パターンA (変更案)': Math.round(item.A.total),
     '差額': Math.round(item.A.total - item.B.total)
   }));
+
+  const handleExportExcel = () => {
+    const exportData = chartData.map(d => ({
+      '年度': d.year,
+      '【現行制度】旧制度①': d['パターンB_旧制度①'],
+      '【現行制度】旧制度②': d['パターンB_旧制度②'],
+      '【現行制度】旧制度③': d['パターンB_旧制度③'],
+      '【現行制度】新制度': d['パターンB_新制度'],
+      '【現行制度】合計': d['パターンB (現行制度)'],
+      '【変更案】旧制度①': d['パターンA_旧制度①'],
+      '【変更案】旧制度②': d['パターンA_旧制度②'],
+      '【変更案】旧制度③': d['パターンA_旧制度③'],
+      '【変更案】新制度': d['パターンA_新制度'],
+      '【変更案】合計': d['パターンA (変更案)'],
+      '差額(変更案-現行制度)': d['差額']
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'グラフデータ');
+    XLSX.writeFile(wb, `シミュレーション_グラフデータ_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
 
   const formatYAxis = (tickItem: number) => {
     return `${(tickItem / 10000).toLocaleString()}万円`;
@@ -128,17 +166,17 @@ export const AnnualCostChart: React.FC<AnnualCostChartProps> = ({ data }) => {
       <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-xs mt-4">
         <div className="flex items-center gap-2">
           <span className="font-bold text-slate-600">現行制度:</span>
-          <span className="flex items-center gap-1"><span className="w-3 h-3 inline-block bg-slate-600 rounded-sm"></span>旧制度①</span>
-          <span className="flex items-center gap-1"><span className="w-3 h-3 inline-block bg-slate-500 rounded-sm"></span>旧制度②</span>
-          <span className="flex items-center gap-1"><span className="w-3 h-3 inline-block bg-slate-400 rounded-sm"></span>旧制度③</span>
-          <span className="flex items-center gap-1"><span className="w-3 h-3 inline-block bg-slate-300 rounded-sm"></span>新制度</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-3 inline-block rounded-sm" style={{ backgroundColor: CHART_COLORS.B.type1 }}></span>旧制度①</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-3 inline-block rounded-sm" style={{ backgroundColor: CHART_COLORS.B.type2 }}></span>旧制度②</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-3 inline-block rounded-sm" style={{ backgroundColor: CHART_COLORS.B.type3 }}></span>旧制度③</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-3 inline-block rounded-sm" style={{ backgroundColor: CHART_COLORS.B.type4 }}></span>新制度</span>
         </div>
         <div className="flex items-center gap-2">
           <span className="font-bold text-blue-600">変更案:</span>
-          <span className="flex items-center gap-1"><span className="w-3 h-3 inline-block bg-blue-600 rounded-sm"></span>旧制度①</span>
-          <span className="flex items-center gap-1"><span className="w-3 h-3 inline-block bg-blue-500 rounded-sm"></span>旧制度②</span>
-          <span className="flex items-center gap-1"><span className="w-3 h-3 inline-block bg-blue-400 rounded-sm"></span>旧制度③</span>
-          <span className="flex items-center gap-1"><span className="w-3 h-3 inline-block bg-blue-300 rounded-sm"></span>新制度</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-3 inline-block rounded-sm" style={{ backgroundColor: CHART_COLORS.A.type1 }}></span>旧制度①</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-3 inline-block rounded-sm" style={{ backgroundColor: CHART_COLORS.A.type2 }}></span>旧制度②</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-3 inline-block rounded-sm" style={{ backgroundColor: CHART_COLORS.A.type3 }}></span>旧制度③</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-3 inline-block rounded-sm" style={{ backgroundColor: CHART_COLORS.A.type4 }}></span>新制度</span>
         </div>
         <div className="flex items-center gap-2">
           <span className="flex items-center gap-1"><span className="w-3 h-1 inline-block bg-red-500"></span>差額</span>
@@ -150,14 +188,15 @@ export const AnnualCostChart: React.FC<AnnualCostChartProps> = ({ data }) => {
   // カスタム凡例 (面・折れ線用)
   const renderSingleLegend = () => {
     const isA = viewPattern === 'A';
+    const colors = isA ? CHART_COLORS.A : CHART_COLORS.B;
     return (
       <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-xs mt-4">
         <div className="flex items-center gap-2">
           <span className={`font-bold ${isA ? 'text-blue-600' : 'text-slate-600'}`}>{isA ? '変更案:' : '現行制度:'}</span>
-          <span className="flex items-center gap-1"><span className={`w-3 h-3 inline-block rounded-sm ${isA ? 'bg-blue-600' : 'bg-slate-600'}`}></span>旧制度①</span>
-          <span className="flex items-center gap-1"><span className={`w-3 h-3 inline-block rounded-sm ${isA ? 'bg-blue-500' : 'bg-slate-500'}`}></span>旧制度②</span>
-          <span className="flex items-center gap-1"><span className={`w-3 h-3 inline-block rounded-sm ${isA ? 'bg-blue-400' : 'bg-slate-400'}`}></span>旧制度③</span>
-          <span className="flex items-center gap-1"><span className={`w-3 h-3 inline-block rounded-sm ${isA ? 'bg-blue-300' : 'bg-slate-300'}`}></span>新制度</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-3 inline-block rounded-sm" style={{ backgroundColor: colors.type1 }}></span>旧制度①</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-3 inline-block rounded-sm" style={{ backgroundColor: colors.type2 }}></span>旧制度②</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-3 inline-block rounded-sm" style={{ backgroundColor: colors.type3 }}></span>旧制度③</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-3 inline-block rounded-sm" style={{ backgroundColor: colors.type4 }}></span>新制度</span>
         </div>
       </div>
     );
@@ -177,15 +216,15 @@ export const AnnualCostChart: React.FC<AnnualCostChartProps> = ({ data }) => {
           <Tooltip content={<CustomTooltip />} />
           <Legend content={renderBarLegend} />
           
-          <Bar dataKey="パターンB_旧制度①" stackId="B" fill="#475569" maxBarSize={40} />
-          <Bar dataKey="パターンB_旧制度②" stackId="B" fill="#64748b" maxBarSize={40} />
-          <Bar dataKey="パターンB_旧制度③" stackId="B" fill="#94a3b8" maxBarSize={40} />
-          <Bar dataKey="パターンB_新制度" stackId="B" fill="#cbd5e1" radius={[4, 4, 0, 0]} maxBarSize={40} />
+          <Bar dataKey="パターンB_旧制度①" stackId="B" fill={CHART_COLORS.B.type1} maxBarSize={40} />
+          <Bar dataKey="パターンB_旧制度②" stackId="B" fill={CHART_COLORS.B.type2} maxBarSize={40} />
+          <Bar dataKey="パターンB_旧制度③" stackId="B" fill={CHART_COLORS.B.type3} maxBarSize={40} />
+          <Bar dataKey="パターンB_新制度" stackId="B" fill={CHART_COLORS.B.type4} radius={[4, 4, 0, 0]} maxBarSize={40} />
 
-          <Bar dataKey="パターンA_旧制度①" stackId="A" fill="#2563eb" maxBarSize={40} />
-          <Bar dataKey="パターンA_旧制度②" stackId="A" fill="#3b82f6" maxBarSize={40} />
-          <Bar dataKey="パターンA_旧制度③" stackId="A" fill="#60a5fa" maxBarSize={40} />
-          <Bar dataKey="パターンA_新制度" stackId="A" fill="#93c5fd" radius={[4, 4, 0, 0]} maxBarSize={40} />
+          <Bar dataKey="パターンA_旧制度①" stackId="A" fill={CHART_COLORS.A.type1} maxBarSize={40} />
+          <Bar dataKey="パターンA_旧制度②" stackId="A" fill={CHART_COLORS.A.type2} maxBarSize={40} />
+          <Bar dataKey="パターンA_旧制度③" stackId="A" fill={CHART_COLORS.A.type3} maxBarSize={40} />
+          <Bar dataKey="パターンA_新制度" stackId="A" fill={CHART_COLORS.A.type4} radius={[4, 4, 0, 0]} maxBarSize={40} />
 
           <Line type="monotone" dataKey="差額" stroke="#ef4444" strokeWidth={2} dot={{ r: 4 }} />
         </ComposedChart>
@@ -193,6 +232,7 @@ export const AnnualCostChart: React.FC<AnnualCostChartProps> = ({ data }) => {
     }
 
     if (chartType === 'area') {
+      const colors = viewPattern === 'A' ? CHART_COLORS.A : CHART_COLORS.B;
       return (
         <AreaChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
@@ -201,15 +241,16 @@ export const AnnualCostChart: React.FC<AnnualCostChartProps> = ({ data }) => {
           <Tooltip content={<CustomTooltip />} />
           <Legend content={renderSingleLegend} />
           
-          <Area type="monotone" dataKey={`パターン${viewPattern}_旧制度①`} stackId="1" stroke={viewPattern === 'A' ? '#2563eb' : '#475569'} fill={viewPattern === 'A' ? '#2563eb' : '#475569'} />
-          <Area type="monotone" dataKey={`パターン${viewPattern}_旧制度②`} stackId="1" stroke={viewPattern === 'A' ? '#3b82f6' : '#64748b'} fill={viewPattern === 'A' ? '#3b82f6' : '#64748b'} />
-          <Area type="monotone" dataKey={`パターン${viewPattern}_旧制度③`} stackId="1" stroke={viewPattern === 'A' ? '#60a5fa' : '#94a3b8'} fill={viewPattern === 'A' ? '#60a5fa' : '#94a3b8'} />
-          <Area type="monotone" dataKey={`パターン${viewPattern}_新制度`} stackId="1" stroke={viewPattern === 'A' ? '#93c5fd' : '#cbd5e1'} fill={viewPattern === 'A' ? '#93c5fd' : '#cbd5e1'} />
+          <Area type="monotone" dataKey={`パターン${viewPattern}_旧制度①`} stackId="1" stroke={colors.type1} fill={colors.type1} />
+          <Area type="monotone" dataKey={`パターン${viewPattern}_旧制度②`} stackId="1" stroke={colors.type2} fill={colors.type2} />
+          <Area type="monotone" dataKey={`パターン${viewPattern}_旧制度③`} stackId="1" stroke={colors.type3} fill={colors.type3} />
+          <Area type="monotone" dataKey={`パターン${viewPattern}_新制度`} stackId="1" stroke={colors.type4} fill={colors.type4} />
         </AreaChart>
       );
     }
 
     if (chartType === 'line') {
+      const colors = viewPattern === 'A' ? CHART_COLORS.A : CHART_COLORS.B;
       return (
         <LineChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
@@ -218,10 +259,10 @@ export const AnnualCostChart: React.FC<AnnualCostChartProps> = ({ data }) => {
           <Tooltip content={<CustomTooltip />} />
           <Legend content={renderSingleLegend} />
           
-          <Line type="monotone" dataKey={`パターン${viewPattern}_旧制度①`} stroke={viewPattern === 'A' ? '#2563eb' : '#475569'} strokeWidth={2} dot={false} />
-          <Line type="monotone" dataKey={`パターン${viewPattern}_旧制度②`} stroke={viewPattern === 'A' ? '#3b82f6' : '#64748b'} strokeWidth={2} dot={false} />
-          <Line type="monotone" dataKey={`パターン${viewPattern}_旧制度③`} stroke={viewPattern === 'A' ? '#60a5fa' : '#94a3b8'} strokeWidth={2} dot={false} />
-          <Line type="monotone" dataKey={`パターン${viewPattern}_新制度`} stroke={viewPattern === 'A' ? '#93c5fd' : '#cbd5e1'} strokeWidth={2} dot={false} />
+          <Line type="monotone" dataKey={`パターン${viewPattern}_旧制度①`} stroke={colors.type1} strokeWidth={2} dot={false} />
+          <Line type="monotone" dataKey={`パターン${viewPattern}_旧制度②`} stroke={colors.type2} strokeWidth={2} dot={false} />
+          <Line type="monotone" dataKey={`パターン${viewPattern}_旧制度③`} stroke={colors.type3} strokeWidth={2} dot={false} />
+          <Line type="monotone" dataKey={`パターン${viewPattern}_新制度`} stroke={colors.type4} strokeWidth={2} dot={false} />
         </LineChart>
       );
     }
@@ -238,6 +279,15 @@ export const AnnualCostChart: React.FC<AnnualCostChartProps> = ({ data }) => {
         </h3>
         
         <div className="flex flex-wrap gap-2">
+          <button 
+            onClick={handleExportExcel}
+            className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-md bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors border border-emerald-200 mr-2"
+            title="グラフデータをExcel出力"
+          >
+            <Download size={14} />
+            Excel出力
+          </button>
+          
           {chartType !== 'bar' && (
             <div className="flex bg-slate-100 p-1 rounded-lg">
               <button 
@@ -320,7 +370,7 @@ export const AnnualCostChart: React.FC<AnnualCostChartProps> = ({ data }) => {
       )}
 
       <div className="w-full overflow-x-auto pb-4">
-        <div style={{ minWidth: '1200px', height: '400px' }}>
+        <div style={{ minWidth: `${Math.max(100, (chartData.length / 10) * 100)}%`, height: '400px' }}>
           <ResponsiveContainer width="100%" height="100%">
             {renderChart()}
           </ResponsiveContainer>

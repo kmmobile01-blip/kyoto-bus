@@ -124,6 +124,7 @@ export interface UnifyNewSystemConfig {
 export interface SimulationConfig {
     label: string;
     unitPrice: number;
+    masterDataSource?: 'default' | 'custom';
     
     // 現行パラメータ (Transition前)
     defaultYearlyEval: number;
