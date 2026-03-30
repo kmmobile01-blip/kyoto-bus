@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Settings } from 'lucide-react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Line, ComposedChart,
   AreaChart, Area, LineChart
@@ -12,6 +13,10 @@ interface AnnualCostChartProps {
 export const AnnualCostChart: React.FC<AnnualCostChartProps> = ({ data }) => {
   const [chartType, setChartType] = useState<'bar' | 'area' | 'line'>('bar');
   const [viewPattern, setViewPattern] = useState<'A' | 'B'>('A');
+  const [showSettings, setShowSettings] = useState(false);
+  const [isAutoYAxis, setIsAutoYAxis] = useState(true);
+  const [yAxisMin, setYAxisMin] = useState<number | ''>('');
+  const [yAxisMax, setYAxisMax] = useState<number | ''>('');
 
   if (!data || data.length === 0) {
     return null;
@@ -158,13 +163,17 @@ export const AnnualCostChart: React.FC<AnnualCostChartProps> = ({ data }) => {
     );
   };
 
+  const yAxisDomain: [any, any] = isAutoYAxis 
+    ? ['auto', 'auto'] 
+    : [yAxisMin === '' ? 'auto' : yAxisMin, yAxisMax === '' ? 'auto' : yAxisMax];
+
   const renderChart = () => {
     if (chartType === 'bar') {
       return (
         <ComposedChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
           <XAxis dataKey="year" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={{ stroke: '#cbd5e1' }} tickLine={false} />
-          <YAxis tickFormatter={formatYAxis} tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+          <YAxis tickFormatter={formatYAxis} tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} domain={yAxisDomain} />
           <Tooltip content={<CustomTooltip />} />
           <Legend content={renderBarLegend} />
           
@@ -188,7 +197,7 @@ export const AnnualCostChart: React.FC<AnnualCostChartProps> = ({ data }) => {
         <AreaChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
           <XAxis dataKey="year" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={{ stroke: '#cbd5e1' }} tickLine={false} />
-          <YAxis tickFormatter={formatYAxis} tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+          <YAxis tickFormatter={formatYAxis} tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} domain={yAxisDomain} />
           <Tooltip content={<CustomTooltip />} />
           <Legend content={renderSingleLegend} />
           
@@ -205,7 +214,7 @@ export const AnnualCostChart: React.FC<AnnualCostChartProps> = ({ data }) => {
         <LineChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
           <XAxis dataKey="year" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={{ stroke: '#cbd5e1' }} tickLine={false} />
-          <YAxis tickFormatter={formatYAxis} tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+          <YAxis tickFormatter={formatYAxis} tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} domain={yAxisDomain} />
           <Tooltip content={<CustomTooltip />} />
           <Legend content={renderSingleLegend} />
           
@@ -265,8 +274,50 @@ export const AnnualCostChart: React.FC<AnnualCostChartProps> = ({ data }) => {
               推移(折れ線)
             </button>
           </div>
+          <button 
+            onClick={() => setShowSettings(!showSettings)} 
+            className={`p-1.5 rounded-md transition-colors ${showSettings ? 'bg-slate-200 text-slate-800' : 'bg-slate-100 text-slate-500 hover:text-slate-700'}`}
+            title="グラフ設定"
+          >
+            <Settings size={18} />
+          </button>
         </div>
       </div>
+
+      {showSettings && (
+        <div className="w-full bg-slate-50 p-3 rounded-md mb-4 flex flex-wrap items-center gap-4 text-sm border border-slate-200">
+          <div className="font-semibold text-slate-700">Y軸設定:</div>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input 
+              type="checkbox" 
+              checked={isAutoYAxis} 
+              onChange={(e) => setIsAutoYAxis(e.target.checked)}
+              className="rounded text-blue-600 focus:ring-blue-500"
+            />
+            自動スケール
+          </label>
+          
+          {!isAutoYAxis && (
+            <div className="flex items-center gap-2">
+              <input 
+                type="number" 
+                placeholder="最小値" 
+                value={yAxisMin}
+                onChange={(e) => setYAxisMin(e.target.value === '' ? '' : Number(e.target.value))}
+                className="w-24 px-2 py-1 border border-slate-300 rounded-md text-sm"
+              />
+              <span className="text-slate-500">〜</span>
+              <input 
+                type="number" 
+                placeholder="最大値" 
+                value={yAxisMax}
+                onChange={(e) => setYAxisMax(e.target.value === '' ? '' : Number(e.target.value))}
+                className="w-24 px-2 py-1 border border-slate-300 rounded-md text-sm"
+              />
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="w-full overflow-x-auto pb-4">
         <div style={{ minWidth: '1200px', height: '400px' }}>

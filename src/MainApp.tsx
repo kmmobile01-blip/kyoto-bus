@@ -6,7 +6,7 @@ import {
     FileSpreadsheet, Loader2, AlertCircle, CheckCircle2, Sliders,
     FileDown, Database, Trash2, ShieldCheck, RotateCcw, Copy, FileText,
     PieChart, Users, Medal, ChevronDown, ChevronUp, UserPlus, Calendar, ArrowRightCircle, HelpCircle,
-    Play, Lock, RefreshCw, Key
+    Play, Lock, RefreshCw, Key, Save
 } from 'lucide-react';
 import { 
     EmployeeInputRow, TableRowT1, TableRowT2, CoefSettings, 
@@ -225,12 +225,18 @@ export default function MainApp() {
 
     // --- Aggregation Logic (Manual Trigger + Config Change) ---
     useEffect(() => {
+        let isCancelled = false;
+
         const calculateAggregatedCosts = async () => {
             if (!data || data.length === 0) {
                 setAggregatedData([]);
                 return;
             }
+            setIsCalculating(true);
+            setProgress(0);
+            setStatus('集計準備中...');
             await new Promise(resolve => setTimeout(resolve, 10));
+            if (isCancelled) return;
 
             const costsMap = new Map<number, {
                 A: { t1: number, t2: number, t3: number, t4: number },
@@ -251,36 +257,59 @@ export default function MainApp() {
             const d2000 = new Date(2000, 2, 31);
             const d2011 = new Date(2011, 8, 30);
 
-            data.forEach((row: EmployeeInputRow) => {
-                // Must calculate B first to handle Adjustment Mode in A
-                const resB = runCalculation(row, configB);
-                const targetAmount = (configA.adjustmentConfig?.enabled || configA.unifyNewSystemConfig?.enabled) && resB ? resB.retirementAllowance : undefined;
-                const targetReserve = (configA.adjustmentConfig?.enabled || configA.unifyNewSystemConfig?.enabled) && resB ? resB.reserve2026 : undefined;
-                
-                const resA = runCalculation(row, configA, targetAmount, targetReserve);
+            let index = 0;
+            const BATCH_SIZE = 50;
+            const startTime = Date.now();
 
-                if (resA && resB) {
-                    // Determine System Type based on join date
-                    const jd = resA.joinDate;
-                    let typeKey: 't1' | 't2' | 't3' | 't4' = 't4';
-                    if (jd <= d1999) typeKey = 't1';
-                    else if (jd <= d2000) typeKey = 't2';
-                    else if (jd <= d2011) typeKey = 't3';
+            while (index < data.length) {
+                if (isCancelled) return;
+                let count = 0;
+                while (index < data.length && count < BATCH_SIZE) {
+                    const row = data[index];
+                    // Must calculate B first to handle Adjustment Mode in A
+                    const resB = runCalculation(row, configB);
+                    const targetAmount = (configA.adjustmentConfig?.enabled || configA.unifyNewSystemConfig?.enabled) && resB ? resB.retirementAllowance : undefined;
+                    const targetReserve = (configA.adjustmentConfig?.enabled || configA.unifyNewSystemConfig?.enabled) && resB ? resB.reserve2026 : undefined;
+                    
+                    const resA = runCalculation(row, configA, targetAmount, targetReserve);
 
-                    // For counts: check if active at fiscal year end
-                    // 2025年度から集計
-                    for (let y = 2025; y <= 2080; y++) {
-                        const fiscalYearEnd = new Date(y + 1, 2, 31);
-                        if (resA.retirementDate >= fiscalYearEnd) {
-                            if(costsMap.has(y)) costsMap.get(y)!.counts[typeKey] += 1;
+                    if (resA && resB) {
+                        // Determine System Type based on join date
+                        const jd = resA.joinDate;
+                        let typeKey: 't1' | 't2' | 't3' | 't4' = 't4';
+                        if (jd <= d1999) typeKey = 't1';
+                        else if (jd <= d2000) typeKey = 't2';
+                        else if (jd <= d2011) typeKey = 't3';
+
+                        // For counts: check if active at fiscal year end
+                        // 2025年度から集計
+                        for (let y = 2025; y <= 2080; y++) {
+                            const fiscalYearEnd = new Date(y + 1, 2, 31);
+                            if (resA.retirementDate >= fiscalYearEnd) {
+                                if(costsMap.has(y)) costsMap.get(y)!.counts[typeKey] += 1;
+                            }
                         }
-                    }
 
-                    // For costs
-                    resA.yearlyDetails.forEach((d: YearlyDetail) => { if (costsMap.has(d.year)) costsMap.get(d.year)!.A[typeKey] += d.amountInc; });
-                    resB.yearlyDetails.forEach((d: YearlyDetail) => { if (costsMap.has(d.year)) costsMap.get(d.year)!.B[typeKey] += d.amountInc; });
+                        // For costs
+                        resA.yearlyDetails.forEach((d: YearlyDetail) => { if (costsMap.has(d.year)) costsMap.get(d.year)!.A[typeKey] += d.amountInc; });
+                        resB.yearlyDetails.forEach((d: YearlyDetail) => { if (costsMap.has(d.year)) costsMap.get(d.year)!.B[typeKey] += d.amountInc; });
+                    }
+                    index++;
+                    count++;
                 }
-            });
+                
+                const currentProgress = Math.round((index / data.length) * 100);
+                setProgress(currentProgress);
+                
+                const elapsedTime = Date.now() - startTime;
+                const estimatedTotalTime = (elapsedTime / index) * data.length;
+                const remainingTime = Math.max(0, Math.round((estimatedTotalTime - elapsedTime) / 1000));
+                
+                setStatus(`集計中... ${currentProgress}% (残り約${remainingTime}秒)`);
+                await new Promise(r => setTimeout(r, 0));
+            }
+
+            if (isCancelled) return;
 
             const sorted: AggregatedYearlyData[] = Array.from(costsMap.entries())
                 .map(([year, val]) => {
@@ -297,15 +326,20 @@ export default function MainApp() {
                 .sort((a, b) => a.year - b.year);
             
             setAggregatedData(sorted);
+            setIsCalculating(false);
+            setStatus('再計算完了');
+            setTimeout(() => { if (!isCancelled) setStatus('待機中'); }, 2000);
         };
 
         calculateAggregatedCosts();
-    }, [data, calcTrigger, configA, configB, runCalculation]); // Re-run when data or configs change
+
+        return () => {
+            isCancelled = true;
+        };
+    }, [data, calcTrigger, configA, configB, runCalculation]);
 
     const handleRunSimulation = () => {
         setCalcTrigger((prev: number) => prev + 1);
-        setStatus('再計算完了');
-        setTimeout(() => setStatus('待機中'), 2000);
     };
 
     // --- Data Analysis Logic ---
@@ -493,6 +527,60 @@ export default function MainApp() {
         });
     };
 
+    const handleSaveConfig = () => {
+        const configData = {
+            configA,
+            configB
+        };
+        const blob = new Blob([JSON.stringify(configData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `simulation_config_${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        setStatus('設定を保存しました');
+        setTimeout(() => setStatus('待機中'), 2000);
+    };
+
+    const handleLoadConfig = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const content = e.target?.result as string;
+                const parsed = JSON.parse(content);
+                if (parsed.configA && parsed.configB) {
+                    // Convert date strings back to Date objects if necessary
+                    const restoreDates = (config: any) => {
+                        if (config.transitionConfig?.date) {
+                            config.transitionConfig.date = new Date(config.transitionConfig.date);
+                        }
+                        return config;
+                    };
+                    
+                    setConfigA(restoreDates(parsed.configA));
+                    setConfigB(restoreDates(parsed.configB));
+                    setStatus('設定を読み込みました');
+                    setTimeout(() => setStatus('待機中'), 2000);
+                } else {
+                    throw new Error('Invalid config format');
+                }
+            } catch (error) {
+                console.error('Failed to load config:', error);
+                alert('設定ファイルの読み込みに失敗しました。正しい形式のJSONファイルを選択してください。');
+                setStatus('設定の読み込みに失敗しました');
+            }
+        };
+        reader.readAsText(file);
+        // Reset input so the same file can be loaded again if needed
+        event.target.value = '';
+    };
+
     const handleResetSettings = (target: 'A' | 'B') => {
         if (window.confirm(`${target === 'A' ? 'パターンA' : 'パターンB'}の設定を初期値に戻しますか？`)) {
             const def = { ...deepClone(DEFAULT_CONFIG), label: target === 'A' ? 'パターンA (変更案)' : 'パターンB (現行制度)' };
@@ -527,6 +615,8 @@ export default function MainApp() {
             const results: { resA: CalculationResult, resB: CalculationResult }[] = [];
             let index = 0;
             const BATCH_SIZE = 50; 
+            const startTime = Date.now();
+
             while (index < data.length) {
                 let count = 0;
                 while (index < data.length && count < BATCH_SIZE) {
@@ -538,8 +628,14 @@ export default function MainApp() {
                     if(resA && resB) results.push({ resA, resB });
                     index++; count++;
                 }
-                setProgress(Math.round((index / data.length) * 100));
-                setStatus(`計算中... ${index} / ${data.length}`);
+                const currentProgress = Math.round((index / data.length) * 100);
+                setProgress(currentProgress);
+                
+                const elapsedTime = Date.now() - startTime;
+                const estimatedTotalTime = (elapsedTime / index) * data.length;
+                const remainingTime = Math.max(0, Math.round((estimatedTotalTime - elapsedTime) / 1000));
+                
+                setStatus(`計算中... ${currentProgress}% (残り約${remainingTime}秒)`);
                 await new Promise(r => setTimeout(r, 0));
             }
             return results;
@@ -1036,6 +1132,25 @@ export default function MainApp() {
                                         <Copy className="w-5 h-5"/> 結果をコピー
                                     </button>
                                 )}
+                                <button 
+                                    onClick={handleSaveConfig} 
+                                    className="flex items-center gap-2 bg-white text-slate-600 px-4 py-2 rounded-xl font-bold shadow-sm hover:bg-slate-50 border border-slate-200 transition-colors"
+                                    title="現在の設定をJSONファイルとして保存します"
+                                >
+                                    <Save className="w-5 h-5"/> 設定保存
+                                </button>
+                                <label 
+                                    className="flex items-center gap-2 bg-white text-slate-600 px-4 py-2 rounded-xl font-bold shadow-sm hover:bg-slate-50 border border-slate-200 transition-colors cursor-pointer"
+                                    title="保存したJSONファイルから設定を読み込みます"
+                                >
+                                    <Upload className="w-5 h-5"/> 設定読込
+                                    <input 
+                                        type="file" 
+                                        accept=".json" 
+                                        onChange={handleLoadConfig} 
+                                        className="hidden" 
+                                    />
+                                </label>
                             </div>
                         </div>
                         <div className="grid md:grid-cols-2 gap-8">
