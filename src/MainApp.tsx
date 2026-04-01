@@ -8,7 +8,7 @@ import {
     FileSpreadsheet, Loader2, AlertCircle, CheckCircle2, Sliders,
     FileDown, Database, Trash2, ShieldCheck, RotateCcw, Copy, FileText,
     PieChart, Users, Medal, ChevronDown, ChevronUp, UserPlus, Calendar, ArrowRightCircle, HelpCircle,
-    Play, Lock, RefreshCw, Key, Save
+    Play, Lock, RefreshCw, Key, Save, Sparkles
 } from 'lucide-react';
 import { 
     EmployeeInputRow, TableRowT1, TableRowT2, CoefSettings, 
@@ -19,7 +19,8 @@ import {
     DEFAULT_COEF_SETTINGS, T1_CSV_HEADERS, T2_CSV_HEADERS, 
     COEF_CSV_HEADERS, COL_ALIASES, EMPLOYEE_CSV_HEADERS
 } from './constants';
-import { processRow, roundTo2, formatDateWithWareki, parseDate, calculatePeriodYears, deepClone } from './utils';
+import { processRow, roundTo2, formatDateWithWareki, parseDate, calculatePeriodYears, deepClone, validateAndClamp } from './utils';
+import { calculateAggregatedCosts } from './aggregationUtils';
 import { ChatConsultant } from './components/ChatConsultant';
 import { ResultCard } from './components/ResultCard';
 import { AIAnalysisReport } from './components/AIAnalysisReport';
@@ -27,6 +28,8 @@ import { MasterEditorModal } from './components/MasterEditorModal';
 import { HelpModal } from './components/HelpModal';
 import { AnnualCostChart } from './components/AnnualCostChart';
 import { ApiSettingsModal } from './components/ApiSettingsModal';
+import AISuggestionModal from './components/AISuggestionModal';
+import { AISuggestion } from './services/aiService';
 
 // 旧制度マスタ(T1形式)を新制度マスタ(T2形式)の構造に変換するヘルパー
 const convertT1toT2 = (t1: TableRowT1[]): TableRowT2[] => {
@@ -79,6 +82,17 @@ const DEFAULT_CONFIG: Omit<SimulationConfig, 'label'> = {
     coefSettingsFuture: DEFAULT_COEF_SETTINGS,
 };
 
+// --- Local Storage Helpers ---
+const restoreDates = (config: any) => {
+    if (config.transitionConfig?.date) {
+        config.transitionConfig.date = new Date(config.transitionConfig.date);
+    }
+    if (config.adjustmentConfig?.date) {
+        config.adjustmentConfig.date = new Date(config.adjustmentConfig.date);
+    }
+    return config;
+};
+
 export default function MainApp() {
     // --- State ---
     const [data, setData] = useState<EmployeeInputRow[]>([]); 
@@ -87,24 +101,58 @@ export default function MainApp() {
     const [customApiKey, setCustomApiKey] = useState<string>(localStorage.getItem('custom_gemini_api_key') || '');
     
     // Deep Clone for independence
-    const [configA, setConfigA] = useState<SimulationConfig>({ 
-        ...deepClone(DEFAULT_CONFIG), 
-        label: 'パターンA (変更案)',
-        transitionConfig: { enabled: false, date: new Date(2027, 2, 31) }
+    const [configA, setConfigA] = useState<SimulationConfig>(() => {
+        const saved = localStorage.getItem('simulation_config_a');
+        if (saved) {
+            try {
+                return restoreDates(JSON.parse(saved));
+            } catch (e) {
+                console.error('Failed to load config A from localStorage', e);
+            }
+        }
+        return { 
+            ...deepClone(DEFAULT_CONFIG), 
+            label: 'パターンA (変更案)',
+            transitionConfig: { enabled: false, date: new Date(2027, 2, 31) }
+        };
     });
-    const [configB, setConfigB] = useState<SimulationConfig>({ ...deepClone(DEFAULT_CONFIG), label: 'パターンB (現行制度)' });
+
+    const [configB, setConfigB] = useState<SimulationConfig>(() => {
+        const saved = localStorage.getItem('simulation_config_b');
+        if (saved) {
+            try {
+                return restoreDates(JSON.parse(saved));
+            } catch (e) {
+                console.error('Failed to load config B from localStorage', e);
+            }
+        }
+        return { ...deepClone(DEFAULT_CONFIG), label: 'パターンB (現行制度)' };
+    });
 
     const [status, setStatus] = useState<string>('待機中');
     const [error, setError] = useState<string | null>(null);
     const [progress, setProgress] = useState<number>(0);
     const [isCalculating, setIsCalculating] = useState<boolean>(false);
-    const [includeDetailedCsv, setIncludeDetailedCsv] = useState<boolean>(false);
+    const [includeDetailedCsv, setIncludeDetailedCsv] = useState<boolean>(true);
     
     // Manual Trigger
     const [calcTrigger, setCalcTrigger] = useState<number>(0);
     
     // Master Editor State
     const [editingPattern, setEditingPattern] = useState<'A' | 'B' | null>(null);
+
+    // AI Suggestion State
+    const [showAISuggestion, setShowAISuggestion] = useState<boolean>(false);
+    const [aiSuggestionTarget, setAiSuggestionTarget] = useState<'A' | 'B'>('A');
+
+    // --- Auto-Save Effect ---
+    useEffect(() => {
+        localStorage.setItem('simulation_config_a', JSON.stringify(configA));
+    }, [configA]);
+
+    useEffect(() => {
+        localStorage.setItem('simulation_config_b', JSON.stringify(configB));
+    }, [configB]);
 
     // Aggregated Data for Chart
     const [aggregatedData, setAggregatedData] = useState<AggregatedYearlyData[]>([]);
@@ -237,7 +285,7 @@ export default function MainApp() {
     useEffect(() => {
         let isCancelled = false;
 
-        const calculateAggregatedCosts = async () => {
+        const runAggregation = async () => {
             if (!data || data.length === 0) {
                 setAggregatedData([]);
                 return;
@@ -248,100 +296,27 @@ export default function MainApp() {
             await new Promise(resolve => setTimeout(resolve, 10));
             if (isCancelled) return;
 
-            const costsMap = new Map<number, {
-                A: { t1: number, t2: number, t3: number, t4: number },
-                B: { t1: number, t2: number, t3: number, t4: number },
-                counts: { t1: number, t2: number, t3: number, t4: number }
-            }>();
-
-            // 2025年度から集計開始 (期間延長: 2080まで)
-            for (let y = 2025; y <= 2080; y++) {
-                costsMap.set(y, {
-                    A: { t1: 0, t2: 0, t3: 0, t4: 0 },
-                    B: { t1: 0, t2: 0, t3: 0, t4: 0 },
-                    counts: { t1: 0, t2: 0, t3: 0, t4: 0 }
-                });
-            }
-
-            const d1999 = new Date(1999, 2, 31);
-            const d2000 = new Date(2000, 2, 31);
-            const d2011 = new Date(2011, 8, 30);
-
-            let index = 0;
-            const BATCH_SIZE = 50;
-            const startTime = Date.now();
-
-            while (index < data.length) {
-                if (isCancelled) return;
-                let count = 0;
-                while (index < data.length && count < BATCH_SIZE) {
-                    const row = data[index];
-                    // Must calculate B first to handle Adjustment Mode in A
-                    const resB = runCalculation(row, configB);
-                    const targetAmount = (configA.adjustmentConfig?.enabled || configA.unifyNewSystemConfig?.enabled) && resB ? resB.retirementAllowance : undefined;
-                    const targetReserve = (configA.adjustmentConfig?.enabled || configA.unifyNewSystemConfig?.enabled) && resB ? resB.reserve2026 : undefined;
-                    
-                    const resA = runCalculation(row, configA, targetAmount, targetReserve);
-
-                    if (resA && resB) {
-                        // Determine System Type based on join date
-                        const jd = resA.joinDate;
-                        let typeKey: 't1' | 't2' | 't3' | 't4' = 't4';
-                        if (jd <= d1999) typeKey = 't1';
-                        else if (jd <= d2000) typeKey = 't2';
-                        else if (jd <= d2011) typeKey = 't3';
-
-                        // For counts: check if active at fiscal year end
-                        // 2025年度から集計
-                        for (let y = 2025; y <= 2080; y++) {
-                            const fiscalYearEnd = new Date(y + 1, 2, 31);
-                            if (resA.retirementDate >= fiscalYearEnd) {
-                                if(costsMap.has(y)) costsMap.get(y)!.counts[typeKey] += 1;
-                            }
-                        }
-
-                        // For costs
-                        resA.yearlyDetails.forEach((d: YearlyDetail) => { if (costsMap.has(d.year)) costsMap.get(d.year)!.A[typeKey] += d.amountInc; });
-                        resB.yearlyDetails.forEach((d: YearlyDetail) => { if (costsMap.has(d.year)) costsMap.get(d.year)!.B[typeKey] += d.amountInc; });
-                    }
-                    index++;
-                    count++;
-                }
-                
-                const currentProgress = Math.round((index / data.length) * 100);
-                setProgress(currentProgress);
-                
-                const elapsedTime = Date.now() - startTime;
-                const estimatedTotalTime = (elapsedTime / index) * data.length;
-                const remainingTime = Math.max(0, Math.round((estimatedTotalTime - elapsedTime) / 1000));
-                
-                setStatus(`集計中... ${currentProgress}% (残り約${remainingTime}秒)`);
-                await new Promise(r => setTimeout(r, 0));
-            }
+            const results = await calculateAggregatedCosts({
+                data,
+                configA,
+                configB,
+                runCalculation,
+                onProgress: (p, r) => {
+                    setProgress(p);
+                    setStatus(`集計中... ${p}% (残り約${r}秒)`);
+                },
+                isCancelled: () => isCancelled
+            });
 
             if (isCancelled) return;
 
-            const sorted: AggregatedYearlyData[] = Array.from(costsMap.entries())
-                .map(([year, val]) => {
-                    const totalA = val.A.t1 + val.A.t2 + val.A.t3 + val.A.t4;
-                    const totalB = val.B.t1 + val.B.t2 + val.B.t3 + val.B.t4;
-                    const totalCount = val.counts.t1 + val.counts.t2 + val.counts.t3 + val.counts.t4;
-                    return {
-                        year,
-                        A: { type1: val.A.t1, type2: val.A.t2, type3: val.A.t3, type4: val.A.t4, total: totalA },
-                        B: { type1: val.B.t1, type2: val.B.t2, type3: val.B.t3, type4: val.B.t4, total: totalB },
-                        counts: { type1: val.counts.t1, type2: val.counts.t2, type3: val.counts.t3, type4: val.counts.t4, total: totalCount }
-                    };
-                })
-                .sort((a, b) => a.year - b.year);
-            
-            setAggregatedData(sorted);
+            setAggregatedData(results);
             setIsCalculating(false);
             setStatus('再計算完了');
             setTimeout(() => { if (!isCancelled) setStatus('待機中'); }, 2000);
         };
 
-        calculateAggregatedCosts();
+        runAggregation();
 
         return () => {
             isCancelled = true;
@@ -687,73 +662,63 @@ export default function MainApp() {
             })];
 
             let detailedData: any[][] = [];
-            if (includeDetailedCsv) {
-                const detailedHeaders = [
-                    "社員番号", "氏名", "年度", "年齢", "生年月日", "入社日", "勤続年数",
-                    "【A】勤続Pt増", "【A】資格Pt増", "【A】評価Pt増", "【A】調整Pt増", "【A】累計Pt", "【A】支給率", "【A】当年度費用",
-                    "【B】勤続Pt増", "【B】資格Pt増", "【B】評価Pt増", "【B】累計Pt", "【B】支給率", "【B】当年度費用",
-                    "当年度費用差分(A-B)"
-                ];
-                detailedData = [detailedHeaders];
+            // 詳細データを作成（常に含めるように変更）
+            const detailedHeaders = [
+                "社員番号", "氏名", "年度", "年齢", "生年月日", "入社日", "勤続年数",
+                "【A】勤続Pt増", "【A】資格Pt増", "【A】評価Pt増", "【A】調整Pt増", "【A】累計Pt", "【A】支給率", "【A】当年度費用",
+                "【B】勤続Pt増", "【B】資格Pt増", "【B】評価Pt増", "【B】累計Pt", "【B】支給率", "【B】当年度費用",
+                "当年度費用差分(A-B)"
+            ];
+            detailedData = [detailedHeaders];
 
-                results.forEach(({ resA, resB }) => {
-                    const years = new Set<number>();
-                    resA.yearlyDetails.forEach(d => years.add(d.year));
-                    resB.yearlyDetails.forEach(d => years.add(d.year));
-                    const sortedYears = Array.from(years).sort((a, b) => a - b);
+            results.forEach(({ resA, resB }) => {
+                const years = new Set<number>();
+                resA.yearlyDetails.forEach(d => years.add(d.year));
+                resB.yearlyDetails.forEach(d => years.add(d.year));
+                const sortedYears = Array.from(years).sort((a, b) => a - b);
 
-                    sortedYears.forEach(year => {
-                        const dA = resA.yearlyDetails.find(d => d.year === year);
-                        const dB = resB.yearlyDetails.find(d => d.year === year);
-                        const age = dA ? dA.age : (dB ? dB.age : '');
-                        const yos = calculatePeriodYears(resA.joinDate, new Date(year, 3, 1));
+                sortedYears.forEach(year => {
+                    const dA = resA.yearlyDetails.find(d => d.year === year);
+                    const dB = resB.yearlyDetails.find(d => d.year === year);
+                    const age = dA ? dA.age : (dB ? dB.age : '');
+                    const yos = calculatePeriodYears(resA.joinDate, new Date(year, 3, 1));
 
-                        detailedData.push([
-                            resA.employeeId, resA.name, year, age, formatDateWithWareki(resA.birthDate), formatDateWithWareki(resA.joinDate), yos,
-                            dA ? dA.losPtInc : 0, dA ? dA.rankPtInc : 0, dA ? dA.evalPtInc : 0, dA ? dA.adjustmentPtInc : 0, dA ? dA.totalPt : 0, dA ? dA.coef : 0, dA ? dA.amountInc : 0,
-                            dB ? dB.losPtInc : 0, dB ? dB.rankPtInc : 0, dB ? dB.evalPtInc : 0, dB ? dB.totalPt : 0, dB ? dB.coef : 0, dB ? dB.amountInc : 0,
-                            (dA ? dA.amountInc : 0) - (dB ? dB.amountInc : 0)
-                        ]);
-                    });
+                    detailedData.push([
+                        resA.employeeId, resA.name, year, age, formatDateWithWareki(resA.birthDate), formatDateWithWareki(resA.joinDate), yos,
+                        dA ? dA.losPtInc : 0, dA ? dA.rankPtInc : 0, dA ? dA.evalPtInc : 0, dA ? dA.adjustmentPtInc : 0, dA ? dA.totalPt : 0, dA ? dA.coef : 0, dA ? dA.amountInc : 0,
+                        dB ? dB.losPtInc : 0, dB ? dB.rankPtInc : 0, dB ? dB.evalPtInc : 0, dB ? dB.totalPt : 0, dB ? dB.coef : 0, dB ? dB.amountInc : 0,
+                        (dA ? dA.amountInc : 0) - (dB ? dB.amountInc : 0)
+                    ]);
                 });
-            }
+            });
 
             if (format === 'csv') {
-                if (includeDetailedCsv) {
-                    const zip = new JSZip();
-                    const encoder = new TextEncoder();
-                    const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
-                    
-                    const aggregatedCsv = Papa.unparse(outData);
-                    const aggregatedBytes = encoder.encode(aggregatedCsv);
-                    const aggregatedWithBom = new Uint8Array(bom.length + aggregatedBytes.length);
-                    aggregatedWithBom.set(bom);
-                    aggregatedWithBom.set(aggregatedBytes, bom.length);
-                    zip.file(`比較結果_集計_${timestamp}.csv`, aggregatedWithBom);
-                    
-                    const detailedCsv = Papa.unparse(detailedData);
-                    const detailedBytes = encoder.encode(detailedCsv);
-                    const detailedWithBom = new Uint8Array(bom.length + detailedBytes.length);
-                    detailedWithBom.set(bom);
-                    detailedWithBom.set(detailedBytes, bom.length);
-                    zip.file(`比較結果_個人別詳細_${timestamp}.csv`, detailedWithBom);
-                    
-                    const content = await zip.generateAsync({ type: 'blob' });
-                    saveAs(content, `退職金シミュレーション_${timestamp}.zip`);
-                } else {
-                    const csv = Papa.unparse(outData);
-                    const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csv], { type: 'text/csv;charset=utf-8;' });
-                    const link = document.createElement("a");
-                    link.href = URL.createObjectURL(blob);
-                    link.download = filename;
-                    link.click();
-                }
+                // CSV出力時は常に詳細データを含めてZIP形式で出力
+                const zip = new JSZip();
+                const encoder = new TextEncoder();
+                const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
+                
+                const aggregatedCsv = Papa.unparse(outData);
+                const aggregatedBytes = encoder.encode(aggregatedCsv);
+                const aggregatedWithBom = new Uint8Array(bom.length + aggregatedBytes.length);
+                aggregatedWithBom.set(bom);
+                aggregatedWithBom.set(aggregatedBytes, bom.length);
+                zip.file(`比較結果_集計_${timestamp}.csv`, aggregatedWithBom);
+                
+                const detailedCsv = Papa.unparse(detailedData);
+                const detailedBytes = encoder.encode(detailedCsv);
+                const detailedWithBom = new Uint8Array(bom.length + detailedBytes.length);
+                detailedWithBom.set(bom);
+                detailedWithBom.set(detailedBytes, bom.length);
+                zip.file(`比較結果_個人別詳細_${timestamp}.csv`, detailedWithBom);
+                
+                const content = await zip.generateAsync({ type: 'blob' });
+                saveAs(content, `退職金シミュレーション_${timestamp}.zip`);
             } else {
                 const wb = XLSX.utils.book_new();
                 XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(outData), "比較結果");
-                if (includeDetailedCsv) {
-                    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(detailedData), "個人別詳細");
-                }
+                // Excel出力時は常に詳細シートを追加
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(detailedData), "個人別詳細");
                 XLSX.writeFile(wb, filename);
             }
             setStatus('完了'); setProgress(100);
@@ -780,16 +745,49 @@ export default function MainApp() {
                 >
                     <RotateCcw className="w-4 h-4"/> 初期値
                 </button>
+                <button 
+                    onClick={() => {
+                        setAiSuggestionTarget(pattern as 'A' | 'B');
+                        setShowAISuggestion(true);
+                    }}
+                    className="text-sm text-indigo-500 hover:text-indigo-700 flex items-center gap-1 font-bold bg-indigo-50 px-2 py-1 rounded-md border border-indigo-100 transition-colors"
+                >
+                    <Sparkles className="w-4 h-4 fill-indigo-500"/> AI提案
+                </button>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">ポイント単価 (円)</label>
-                    <input type="number" value={config.unitPrice} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfig({...config, unitPrice: Number(e.target.value)})} className="w-full p-2.5 border-slate-300 rounded text-base text-right" />
+                    <input 
+                        type="number" 
+                        value={config.unitPrice} 
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                            const val = e.target.value === '' ? 0 : Number(e.target.value);
+                            setConfig({...config, unitPrice: val});
+                        }} 
+                        onBlur={(e: React.FocusEvent<HTMLInputElement>) => {
+                            const val = validateAndClamp(e.target.value, 1, 1000000, 10000);
+                            setConfig({...config, unitPrice: val});
+                        }}
+                        className="w-full p-2.5 border-slate-300 rounded text-base text-right" 
+                    />
                 </div>
                 <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">標準考課Pt (年)</label>
-                    <input type="number" value={config.defaultYearlyEval} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfig({...config, defaultYearlyEval: Number(e.target.value)})} className="w-full p-2.5 border-slate-300 rounded text-base text-right" />
+                    <input 
+                        type="number" 
+                        value={config.defaultYearlyEval} 
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                            const val = e.target.value === '' ? 0 : Number(e.target.value);
+                            setConfig({...config, defaultYearlyEval: val});
+                        }} 
+                        onBlur={(e: React.FocusEvent<HTMLInputElement>) => {
+                            const val = validateAndClamp(e.target.value, 0, 100, 10);
+                            setConfig({...config, defaultYearlyEval: val});
+                        }}
+                        className="w-full p-2.5 border-slate-300 rounded text-base text-right" 
+                    />
                 </div>
             </div>
 
@@ -817,8 +815,13 @@ export default function MainApp() {
                                 <Calendar className="w-5 h-5 absolute left-3 top-2.5 text-slate-500"/>
                                 <input 
                                     type="date" 
-                                    value={config.transitionConfig.date instanceof Date ? config.transitionConfig.date.toISOString().split('T')[0] : ''}
-                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfig({ ...config, transitionConfig: { ...config.transitionConfig, date: new Date(e.target.value) } })}
+                                    value={config.transitionConfig.date instanceof Date && !isNaN(config.transitionConfig.date.getTime()) ? config.transitionConfig.date.toISOString().split('T')[0] : ''}
+                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                                        const d = new Date(e.target.value);
+                                        if (!isNaN(d.getTime())) {
+                                            setConfig({ ...config, transitionConfig: { ...config.transitionConfig, date: d } });
+                                        }
+                                    }} 
                                     className="w-full pl-10 p-2.5 text-base border-slate-300 rounded shadow-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
                                 />
                             </div>
@@ -987,7 +990,14 @@ export default function MainApp() {
                                 <input 
                                     type="number" 
                                     value={(config.retirementAges as any)[t]} 
-                                    onChange={(e: any) => setConfig({...config, retirementAges: {...config.retirementAges, [t]: Number(e.target.value)}})} 
+                                    onChange={(e: any) => {
+                                        const val = e.target.value === '' ? 0 : Number(e.target.value);
+                                        setConfig({...config, retirementAges: {...config.retirementAges, [t]: val}});
+                                    }} 
+                                    onBlur={(e: any) => {
+                                        const val = validateAndClamp(e.target.value, 50, 80, 65);
+                                        setConfig({...config, retirementAges: {...config.retirementAges, [t]: val}});
+                                    }}
                                     disabled={config.adjustmentConfig?.enabled || config.unifyNewSystemConfig?.enabled}
                                     className={`w-full p-1.5 sm:p-2 border-slate-300 rounded text-sm sm:text-base text-center ${config.adjustmentConfig?.enabled || config.unifyNewSystemConfig?.enabled ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : ''}`}
                                 />
@@ -1005,7 +1015,14 @@ export default function MainApp() {
                                 <input 
                                     type="number" min={30} max={47}
                                     value={(config.cutoffYears as any)[t]} 
-                                    onChange={(e: any) => setConfig({...config, cutoffYears: {...config.cutoffYears, [t]: Number(e.target.value)}})} 
+                                    onChange={(e: any) => {
+                                        const val = e.target.value === '' ? 0 : Number(e.target.value);
+                                        setConfig({...config, cutoffYears: {...config.cutoffYears, [t]: val}});
+                                    }} 
+                                    onBlur={(e: any) => {
+                                        const val = validateAndClamp(e.target.value, 10, 60, 47);
+                                        setConfig({...config, cutoffYears: {...config.cutoffYears, [t]: val}});
+                                    }}
                                     className="w-full p-1.5 sm:p-2 border-slate-300 rounded text-sm sm:text-base text-center" 
                                 />
                             </div>
@@ -1027,7 +1044,14 @@ export default function MainApp() {
                                     <input 
                                         type="number" 
                                         value={(config.retirementAgesFuture as any)[t]} 
-                                        onChange={(e: any) => setConfig({...config, retirementAgesFuture: {...config.retirementAgesFuture, [t]: Number(e.target.value)}})} 
+                                        onChange={(e: any) => {
+                                            const val = e.target.value === '' ? 0 : Number(e.target.value);
+                                            setConfig({...config, retirementAgesFuture: {...config.retirementAgesFuture, [t]: val}});
+                                        }} 
+                                        onBlur={(e: any) => {
+                                            const val = validateAndClamp(e.target.value, 50, 80, 65);
+                                            setConfig({...config, retirementAgesFuture: {...config.retirementAgesFuture, [t]: val}});
+                                        }}
                                         disabled={config.adjustmentConfig?.enabled || config.unifyNewSystemConfig?.enabled}
                                         className={`w-full p-1.5 sm:p-2 border-indigo-200 rounded text-sm sm:text-base text-center ${config.adjustmentConfig?.enabled || config.unifyNewSystemConfig?.enabled ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-indigo-50 focus:ring-indigo-500'}`}
                                     />
@@ -1046,7 +1070,14 @@ export default function MainApp() {
                                         <input 
                                             type="number" min={30} max={47}
                                             value={(config.cutoffYearsFuture as any)[t]} 
-                                            onChange={(e: any) => setConfig({...config, cutoffYearsFuture: {...config.cutoffYearsFuture, [t]: Number(e.target.value)}})} 
+                                            onChange={(e: any) => {
+                                                const val = e.target.value === '' ? 0 : Number(e.target.value);
+                                                setConfig({...config, cutoffYearsFuture: {...config.cutoffYearsFuture, [t]: val}});
+                                            }} 
+                                            onBlur={(e: any) => {
+                                                const val = validateAndClamp(e.target.value, 10, 60, 47);
+                                                setConfig({...config, cutoffYearsFuture: {...config.cutoffYearsFuture, [t]: val}});
+                                            }}
                                             className="w-full p-1.5 sm:p-2 border-indigo-200 rounded text-sm sm:text-base text-center bg-indigo-50 focus:ring-indigo-500" 
                                         />
                                     </div>
@@ -1058,7 +1089,14 @@ export default function MainApp() {
                             <input 
                                 type="number" 
                                 value={config.defaultYearlyEvalFuture} 
-                                onChange={(e: any) => setConfig({...config, defaultYearlyEvalFuture: Number(e.target.value)})} 
+                                onChange={(e: any) => {
+                                    const val = e.target.value === '' ? 0 : Number(e.target.value);
+                                    setConfig({...config, defaultYearlyEvalFuture: val});
+                                }} 
+                                onBlur={(e: any) => {
+                                    const val = validateAndClamp(e.target.value, 0, 100, 10);
+                                    setConfig({...config, defaultYearlyEvalFuture: val});
+                                }}
                                 className="w-full p-2 border-indigo-200 rounded text-base text-right bg-indigo-50 focus:ring-indigo-500 sm:mt-6" 
                             />
                         </div>
@@ -1285,16 +1323,16 @@ export default function MainApp() {
                                         CSV出力
                                     </button>
                                 </div>
-                                <div className="flex items-center gap-2 mt-2">
+                                <div className="flex items-center gap-2 mt-2 opacity-50 cursor-not-allowed">
                                     <input 
                                         type="checkbox" 
                                         id="includeDetailedCsv" 
-                                        checked={includeDetailedCsv} 
-                                        onChange={(e) => setIncludeDetailedCsv(e.target.checked)}
-                                        className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
+                                        checked={true} 
+                                        disabled={true}
+                                        className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
                                     />
-                                    <label htmlFor="includeDetailedCsv" className="text-sm text-slate-600 cursor-pointer font-medium">
-                                        個人別の年度別詳細データも含める (CSV/Excel出力時)
+                                    <label htmlFor="includeDetailedCsv" className="text-sm text-slate-600 font-medium">
+                                        個人別の年度別詳細データも含める (常に有効)
                                     </label>
                                 </div>
                             </div>
@@ -1404,10 +1442,28 @@ export default function MainApp() {
                     <HelpModal onClose={() => setShowHelp(false)} />
                 )}
                 <ApiSettingsModal 
+                    key={showApiSettings ? 'open' : 'closed'}
                     isOpen={showApiSettings} 
                     onClose={() => setShowApiSettings(false)} 
                     customApiKey={customApiKey} 
                     setCustomApiKey={setCustomApiKey} 
+                />
+                <AISuggestionModal 
+                    isOpen={showAISuggestion}
+                    onClose={() => setShowAISuggestion(false)}
+                    currentConfig={aiSuggestionTarget === 'A' ? configA : configB}
+                    currentResults={aggregatedData}
+                    onApply={(suggested) => {
+                        const setConfig = aiSuggestionTarget === 'A' ? setConfigA : setConfigB;
+                        const currentConfig = aiSuggestionTarget === 'A' ? configA : configB;
+                        setConfig({
+                            ...currentConfig,
+                            retirementAges: suggested.retirementAges,
+                            unitPrice: suggested.pointValue,
+                            defaultYearlyEval: suggested.defaultYearlyEval,
+                            cutoffYears: suggested.cutoffYears
+                        });
+                    }}
                 />
                 <ChatConsultant config={configA} aggregatedData={aggregatedData} customApiKey={customApiKey} />
             </div>

@@ -11,10 +11,6 @@ interface ApiSettingsModalProps {
 export const ApiSettingsModal: React.FC<ApiSettingsModalProps> = ({ isOpen, onClose, customApiKey, setCustomApiKey }) => {
     const [tempKey, setTempKey] = useState(customApiKey);
 
-    useEffect(() => {
-        setTempKey(customApiKey);
-    }, [customApiKey, isOpen]);
-
     if (!isOpen) return null;
 
     const handleSave = () => {

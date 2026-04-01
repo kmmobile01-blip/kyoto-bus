@@ -33,6 +33,15 @@ export const deepClone = <T>(obj: T): T => {
     return clonedObj;
 };
 
+/**
+ * 数値のバリデーションとクランプ（範囲制限）
+ */
+export const validateAndClamp = (val: any, min: number, max: number, defaultVal: number): number => {
+    const num = typeof val === 'string' ? parseFloat(val) : Number(val);
+    if (isNaN(num)) return defaultVal;
+    return Math.min(Math.max(num, min), max);
+};
+
 export const parseDate = (val: string | number | undefined | Date): Date | null => {
     if (!val) return null;
     if (val instanceof Date) return val;
